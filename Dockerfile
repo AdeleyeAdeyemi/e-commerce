@@ -6,6 +6,8 @@ COPY app.py .
 COPY requirements.txt .
 COPY templates ./templates
 COPY static ./static
+COPY products.json .
+
 
 RUN pip install --no-cache-dir -r requirements.txt
 
