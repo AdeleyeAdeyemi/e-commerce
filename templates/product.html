@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.name }} - My Shop{% endblock %}
+
+{% block content %}
+  <h2>{{ product.name }}</h2>
+  <img src="{{ product.image }}" alt="{{ product.name }}" />
+  <p>{{ product.description }}</p>
+  <p>Price: ${{ "%.2f"|format(product.price) }}</p>
+
+  <form method="POST" action="{{ url_for('add_to_cart', product_id=product.id) }}">
+    <label for="quantity">Quantity:</label>
+    <input type="number" name="quantity" id="quantity" value="1" min="1" />
+    <button type="submit">Add to Cart</button>
+  </form>
+{% endblock %}

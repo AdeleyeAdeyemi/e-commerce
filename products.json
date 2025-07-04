@@ -1,0 +1,5 @@
+[
+  {"id": 1, "name": "Red T-Shirt", "price": 19.99, "description": "Comfortable red t-shirt", "image": "https://via.placeholder.com/150"},
+  {"id": 2, "name": "Blue Jeans", "price": 49.99, "description": "Stylish blue jeans", "image": "https://via.placeholder.com/150"},
+  {"id": 3, "name": "Sneakers", "price": 89.99, "description": "Running sneakers", "image": "https://via.placeholder.com/150"}
+]

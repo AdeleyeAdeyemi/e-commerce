@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  calculator:
+    build: .
+    ports:
+      - "8877:8777"
+    volumes:
+      - ./templates:/app/templates:ro
+      - ./static:/app/static:ro
