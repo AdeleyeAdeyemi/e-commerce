@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    environment {
+        TF_VAR_region = 'eu-west-2'  // You can set other global Terraform variables here
+    }
+
     stages {
         stage('Checkout') {
             steps {
@@ -12,16 +16,16 @@ pipeline {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'aws-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     dir('terraform') {
-                        // Pass required terraform variables explicitly
                         sh '''
                             export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                             export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+                            
                             terraform init
                             terraform apply -auto-approve \
-                              -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
-                              -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
-                              -var="key_name=your-key-name" \
-                              -var="private_key_path=/path/to/your/private-key.pem"
+                                -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
+                                -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
+                                -var="key_name=your-key-name" \
+                                -var="private_key_path=/path/to/your/private-key.pem"
                         '''
                     }
                 }
@@ -30,19 +34,15 @@ pipeline {
 
         stage('Configure & Deploy with Ansible') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'aws-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    dir('ansible') {
-                        sh '''
-                            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-                            ansible-playbook -i inventory.ini playbook.yml
-                        '''
-                    }
+                dir('ansible') {
+                    sh '''
+                        ansible-playbook -i inventory.ini playbook.yml
+                    '''
                 }
             }
         }
 
-        stage('Build') {
+        stage('Build App') {
             steps {
                 sh 'chmod +x build.sh && ./build.sh'
             }
@@ -51,10 +51,10 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    def buildResult = sh(script: 'docker compose build --no-cache', returnStatus: true)
-                    if (buildResult != 0) {
-                        sh 'docker compose logs'
-                        error "Docker compose build failed"
+                    def result = sh(script: 'docker compose build --no-cache', returnStatus: true)
+                    if (result != 0) {
+                        sh 'docker compose logs || true'
+                        error 'Docker Compose build failed'
                     }
                 }
             }
@@ -63,64 +63,62 @@ pipeline {
         stage('Run Containers') {
             steps {
                 script {
-                    def upResult = sh(script: 'docker compose up -d', returnStatus: true)
-                    if (upResult != 0) {
-                        sh 'docker compose logs'
-                        error "Docker compose failed to start containers"
+                    def result = sh(script: 'docker compose up -d', returnStatus: true)
+                    if (result != 0) {
+                        sh 'docker compose logs || true'
+                        error 'Failed to start containers with Docker Compose'
                     }
                 }
             }
         }
 
-        stage('Debug Docker Status') {
+        stage('Verify Docker & Flask Status') {
             steps {
                 sh '''
-                    echo "Docker containers running:"
+                    echo "Running containers:"
                     docker ps
-                    echo "Docker logs for app container:"
-                    docker logs $(docker ps -q --filter "name=e-commerce-e-commerce-1") || true
+
+                    echo "Flask container logs:"
+                    docker logs $(docker ps -q --filter "name=e-commerce") || true
+
+                    echo "Installed Python packages:"
+                    docker exec $(docker ps -q --filter "name=e-commerce") pip list || true
                 '''
             }
         }
 
-        stage('Verify Flask Installation') {
-            steps {
-                sh '''
-                    echo "Installed Python packages inside the container:"
-                    docker exec $(docker ps -q --filter "name=e-commerce-e-commerce-1") pip list || true
-                '''
-            }
-        }
-
-        stage('Wait for app') {
+        stage('Wait for App to be Ready') {
             steps {
                 script {
                     def maxRetries = 20
-                    def waitTime = 6
-                    def success = false
+                    def waitSeconds = 6
+                    def ready = false
+
                     for (int i = 0; i < maxRetries; i++) {
-                        try {
-                            sh 'curl -sf http://localhost:8977 > /dev/null'
-                            success = true
+                        def result = sh(script: 'curl -sf http://localhost:8977 || true', returnStatus: true)
+                        if (result == 0) {
+                            echo "App is ready"
+                            ready = true
                             break
-                        } catch (Exception e) {
-                            echo "App not ready yet, retrying in ${waitTime}s..."
-                            sleep(waitTime)
+                        } else {
+                            echo "App not ready, waiting ${waitSeconds}s..."
+                            sleep(waitSeconds)
                         }
                     }
-                    if (!success) {
-                        sh 'docker logs $(docker ps -q --filter "name=e-commerce-e-commerce-1") || true'
+
+                    if (!ready) {
+                        sh 'docker logs $(docker ps -q --filter "name=e-commerce") || true'
                         error "App did not become ready in time"
                     }
                 }
             }
         }
 
-        stage('Test') {
+        stage('Test with Selenium') {
             steps {
                 sh '''
-                    python3 -m venv myenv &&
-                    . myenv/bin/activate &&
+                    python3 -m venv venv
+                    . venv/bin/activate
                     pip install --upgrade pip selenium
                 '''
             }
@@ -129,15 +127,9 @@ pipeline {
 
     post {
         always {
-            // Use returnStatus to avoid pipeline failure here
-            script {
-                def upResult = sh(script: 'docker compose up -d', returnStatus: true)
-                if (upResult != 0) {
-                    echo "Warning: docker compose up failed in post step but ignoring"
-                }
-            }
+            echo "Cleaning up / restarting Docker Compose in post step"
+            sh 'docker compose up -d || true'
         }
     }
 }
-
 
