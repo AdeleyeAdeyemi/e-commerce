@@ -1,12 +1,6 @@
 pipeline {
     agent any
 
-    environment {
-        // Inject AWS credentials stored in Jenkins credentials store with ID 'aws-creds'
-        AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
-        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
-    }
-
     stages {
         stage('Checkout') {
             steps {
@@ -16,21 +10,29 @@ pipeline {
 
         stage('Provision Infrastructure') {
             steps {
-                dir('terraform') {
-                    sh '''
-                        export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-                        export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-                        terraform init
-                        terraform apply -auto-approve
-                    '''
+                withCredentials([usernamePassword(credentialsId: 'aws-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                    dir('terraform') {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+                            terraform init
+                            terraform apply -auto-approve
+                        '''
+                    }
                 }
             }
         }
 
         stage('Configure & Deploy with Ansible') {
             steps {
-                dir('ansible') {
-                    sh 'ansible-playbook -i inventory.ini playbook.yml'
+                withCredentials([usernamePassword(credentialsId: 'aws-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                    dir('ansible') {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+                            ansible-playbook -i inventory.ini playbook.yml
+                        '''
+                    }
                 }
             }
         }
@@ -122,9 +124,10 @@ pipeline {
 
     post {
         always {
-            sh 'docker compose up -d'
+            node {
+                sh 'docker compose up -d'
+            }
         }
     }
 }
-
 
