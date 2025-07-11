@@ -124,7 +124,6 @@ pipeline {
 
     post {
         always {
-            node {
                 sh 'docker compose up -d'
             }
         }
