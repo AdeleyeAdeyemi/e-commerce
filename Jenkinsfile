@@ -4,7 +4,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/Undefinedboss/e-commerce'
+                git branch: 'main', url: 'https://github.com/AdeleyeAdeyemi/e-commerce'
             }
         }
 
