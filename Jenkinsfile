@@ -6,6 +6,25 @@ pipeline {
             steps {
                 git branch: 'main', url: 'https://github.com/AdeleyeAdeyemi/e-commerce'
             }
+            stage('Provision Infrastructure') {
+        steps {
+            sh '''
+                cd terraform
+                terraform init
+                terraform apply -auto-approve
+            '''
+        }
+    }
+    
+    stage('Configure & Deploy with Ansible') {
+        steps {
+            sh '''
+                cd ansible
+                ansible-playbook -i inventory.ini playbook.yml
+            '''
+        }
+    }
+
         }
 
         stage('Build') {
