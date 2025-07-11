@@ -11,7 +11,7 @@ resource "aws_instance" "flask_app" {
   associate_public_ip_address = true
 
   tags = {
-    Name = "flask-ecommerce-app"
+    Name = "flask-e-commerce-app"
   }
 
   provisioner "local-exec" {
