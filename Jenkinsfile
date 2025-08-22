@@ -52,15 +52,26 @@ pipeline {
         stage('Prepare Ansible Inventory') {
             steps {
                 script {
-                    def publicIp = sh(script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
-                    def privateKey = sh(script: "terraform -chdir=${TERRAFORM_DIR} output -raw private_key_pem", returnStdout: true).trim()
+                    stage('Prepare Ansible Inventory') {
+    steps {
+        script {
+            // Get Terraform outputs
+            def publicIp = sh(
+                script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip", 
+                returnStdout: true
+            ).trim()
+            
+            def privateKey = sh(
+                script: "terraform -chdir=${TERRAFORM_DIR} output -raw private_key_pem", 
+                returnStdout: true
+            ).trim()  // remove extra spaces/newlines
 
-                    // Save private key
-                    writeFile file: 'private_key.pem', text: privateKey
-                    sh 'chmod 600 private_key.pem'
-                    
-                    // ✅ Write correct YAML inventory
-                    writeFile file: "inventory_generated.yml", text: """
+            // Save private key with correct permissions
+            writeFile file: 'private_key.pem', text: privateKey
+            sh 'chmod 600 private_key.pem'
+
+            // Write Ansible inventory YAML
+            def inventory = """
 web:
   hosts:
     ${publicIp}:
@@ -68,10 +79,12 @@ web:
       ansible_ssh_private_key_file: private_key.pem
       ansible_python_interpreter: /usr/bin/python3
 """
-                }
-            }
+            writeFile file: 'inventory_generated.yml', text: inventory
         }
+    }
+}
 
+        
         stage('Configure & Deploy with Ansible') {
             steps {
                 sh 'ansible-playbook -i inventory_generated.yml ansible/playbook.yml'
@@ -117,6 +130,7 @@ web:
         }
     }
 }
+
 
 
 
