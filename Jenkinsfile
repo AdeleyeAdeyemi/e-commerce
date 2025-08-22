@@ -49,7 +49,7 @@ pipeline {
 
         stage('Prepare Ansible Inventory') {
             steps {
-                sh 'ansible-playbook -i inventory/hosts prepare_inventory.yml'
+                sh 'ansible-playbook -i ansible/inventory.c ansible/playbook.yml'
             }
         }
 
@@ -91,3 +91,4 @@ pipeline {
         }
     }
 }
+
