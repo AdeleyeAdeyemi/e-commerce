@@ -59,7 +59,7 @@ pipeline {
                     
                     // ✅ Write correct YAML inventory
                     writeFile file: "inventory_generated.yml", text: """
-all:
+web:
   hosts:
     ${publicIp}:
       ansible_user: ec2-user
@@ -97,7 +97,7 @@ all:
         stage('Run Selenium Tests') {
             steps {
                 sh '''
-                    python3 -m venv venv
+                    python3 -m venv venv --copies venv
                     ./venv/bin/pip install --upgrade pip --break-system-packages
                     ./venv/bin/pip install -r requirements.txt --break-system-packages
                     ./venv/bin/pip install pytest selenium --break-system-packages
@@ -115,5 +115,6 @@ all:
         }
     }
 }
+
 
 
