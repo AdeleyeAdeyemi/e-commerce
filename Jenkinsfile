@@ -35,7 +35,7 @@ pipeline {
                             terraform plan -out=tfplan \
                                 -var="aws_access_key=$AWS_ACCESS_KEY_ID" \
                                 -var="aws_secret_key=$AWS_SECRET_ACCESS_KEY" \
-                                -var="key_name=terraform-generated-key"
+                                -var="key_name=com"
 
                             terraform apply -auto-approve tfplan
                         '''
@@ -54,7 +54,7 @@ pipeline {
                     ).trim()
 
                     def privateKey = sh(
-                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw terraform_key_pem | tr -d '\\r'",
+                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_1p",
                         returnStdout: true
                     ).trim()
 
@@ -120,4 +120,5 @@ all:
         }
     }
 }
+
 
