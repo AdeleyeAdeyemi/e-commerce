@@ -66,17 +66,3 @@ resource "aws_instance" "flask_app" {
   }
 }
 
-# Output public IP
-output "public_ip" {
-  description = "Public IP of the Flask app"
-  value       = aws_instance.flask_app.public_ip
-}
-
-# Output private key for Jenkins/Ansible
-output "private_key_pem" {
-  description = "Private key for SSH access"
-  value       = tls_private_key.terraform_key.private_key_pem
-  sensitive   = true
-}
-
-
