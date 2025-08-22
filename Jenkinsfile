@@ -22,7 +22,7 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
                             
                             terraform init
-                            terraform apply -auto-approve -var-file=terraform.tfvars
+                            terraform apply -auto-approve \
                                 -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
                                 -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
                                 -var="key_name=terraform-generated-key" \
@@ -132,6 +132,7 @@ pipeline {
         }
     }
 }
+
 
 
 
