@@ -47,43 +47,28 @@ pipeline {
         stage('Prepare Ansible Inventory') {
             steps {
                 script {
-                    sh """
-                        terraform -chdir=terraform output -raw public_ip > public_ip.txt
-                        terraform -chdir=terraform output -raw terraform_key_pem > terraform-key.pem
-                        chmod 600 terraform-key.pem
-        
-                        cat > inventory_generated.yml <<EOL
-        all:
-          hosts:
-            \$(cat public_ip.txt):
-              ansible_user: ec2-user
-              ansible_ssh_private_key_file: \$(pwd)/terraform-key.pem
-        EOL
-                    """
-        }
-    }
-}
-
+                    // Get Terraform outputs
                     def publicIp = sh(
                         script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
                         returnStdout: true
                     ).trim()
-                    
-                    // Get private key directly from Terraform output, remove carriage returns
+
                     def privateKey = sh(
                         script: "terraform -chdir=${TERRAFORM_DIR} output -raw terraform_key_pem | tr -d '\\r'",
                         returnStdout: true
                     ).trim()
 
-                    writeFile file: 'private_key.pem', text: privateKey
-                    sh 'chmod 600 private_key.pem'
+                    // Save private key
+                    writeFile file: 'terraform-key.pem', text: privateKey
+                    sh 'chmod 600 terraform-key.pem'
 
+                    // Create Ansible inventory
                     def inventory = """
-web:
+all:
   hosts:
     ${publicIp}:
       ansible_user: ec2-user
-      ansible_ssh_private_key_file: /var/lib/jenkins/workspace/e-commerce/terraform/terraform-key.pem
+      ansible_ssh_private_key_file: ${pwd()}/terraform-key.pem
       ansible_python_interpreter: /usr/bin/python3
 """
                     writeFile file: 'inventory_generated.yml', text: inventory
@@ -118,7 +103,7 @@ web:
         stage('Run Selenium Tests') {
             steps {
                 sh '''
-                    python3 -m venv venv --copies venv
+                    python3 -m venv venv --copies
                     ./venv/bin/pip install --upgrade pip --break-system-packages
                     ./venv/bin/pip install -r requirements.txt --break-system-packages
                     ./venv/bin/pip install pytest selenium --break-system-packages
