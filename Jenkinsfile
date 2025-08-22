@@ -35,7 +35,7 @@ pipeline {
                             terraform plan -out=tfplan \
                                 -var="aws_access_key=$AWS_ACCESS_KEY_ID" \
                                 -var="aws_secret_key=$AWS_SECRET_ACCESS_KEY" \
-                                -var="key_name=com"
+                                -var="key_name=com-new"
 
                             terraform apply -auto-approve tfplan
                         '''
@@ -54,7 +54,7 @@ pipeline {
                     ).trim()
 
     
-                    def pemFile = "${WORKSPACE}/com.pem"
+                    def pemFile = "${WORKSPACE}/com-new.pem"
 
                     sh "chmod 600 ${pemFile}"
 
@@ -116,6 +116,7 @@ all:
         }
     }
 }
+
 
 
 
