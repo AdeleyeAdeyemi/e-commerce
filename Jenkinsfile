@@ -4,7 +4,7 @@ pipeline {
     environment {
         TF_VAR_region = 'eu-west-2'
         TERRAFORM_DIR = 'terraform'
-        ANSIBLE_DIR = 'ansible'
+        ANSIBLE_DIR   = 'ansible'
     }
 
     stages {
@@ -14,20 +14,23 @@ pipeline {
             }
         }
 
-        stage('Terraform Init & Apply') {
+        stage('Terraform Init & Plan') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'aws-credentials',
-                        usernameVariable: 'AWS_ACCESS_KEY_ID',
-                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                    )
-                ]) {
+                dir("${TERRAFORM_DIR}") {
+                    sh 'terraform init'
+                    sh 'terraform plan'
+                }
+            }
+        }
+
+        stage('Provision Infrastructure') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'aws-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     dir("${TERRAFORM_DIR}") {
                         sh """
                             export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                             export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-                            terraform init
+
                             terraform apply -auto-approve \
                                 -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
                                 -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
@@ -38,16 +41,24 @@ pipeline {
             }
         }
 
-        stage('Prepare Ansible Inventory') {
+        stage('Prepare Ansible Inventory & Key') {
             steps {
                 dir("${ANSIBLE_DIR}") {
                     script {
-                        def publicIp = sh(script: "terraform -chdir=../${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
+                        // Capture Terraform outputs
+                        env.PUBLIC_IP = sh(script: "terraform -chdir=../${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
+                        env.PRIVATE_KEY = sh(script: "terraform -chdir=../${TERRAFORM_DIR} output -raw private_key_pem", returnStdout: true).trim()
+
+                        // Write inventory
                         writeFile file: 'inventory.ini', text: """[web]
-${publicIp} ansible_user=ec2-user ansible_private_key_file=../${TERRAFORM_DIR}/terraform-generated-key.pem ansible_python_interpreter=/usr/bin/python3
+${env.PUBLIC_IP} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/python3
 """
                         sh 'dos2unix inventory.ini playbook.yml'
                         sh 'cat inventory.ini'
+
+                        // Write private key to temp file (in-memory use only, not committed)
+                        writeFile file: 'temp_key.pem', text: env.PRIVATE_KEY
+                        sh 'chmod 600 temp_key.pem'
                     }
                 }
             }
@@ -56,7 +67,9 @@ ${publicIp} ansible_user=ec2-user ansible_private_key_file=../${TERRAFORM_DIR}/t
         stage('Configure & Deploy with Ansible') {
             steps {
                 dir("${ANSIBLE_DIR}") {
-                    sh 'ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.ini playbook.yml'
+                    sshagent(['temp_key.pem']) {
+                        sh 'ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.ini playbook.yml'
+                    }
                 }
             }
         }
@@ -76,67 +89,6 @@ ${publicIp} ansible_user=ec2-user ansible_private_key_file=../${TERRAFORM_DIR}/t
                         sh 'docker compose logs || true'
                         error 'Failed to start containers'
                     }
-                }
-            }
-        }
-
-        stage('Deploy ELK Stack') {
-            steps {
-                sh '''
-                    cat > docker-compose.override.yml <<EOL
-services:
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
-    container_name: elasticsearch
-    environment:
-      - discovery.type=single-node
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
-    ports:
-      - "9200:9200"
-  logstash:
-    image: docker.elastic.co/logstash/logstash:8.11.1
-    container_name: logstash
-    volumes:
-      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
-    ports:
-      - "5044:5044"
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.11.1
-    container_name: kibana
-    ports:
-      - "5601:5601"
-EOL
-
-                    cat > logstash.conf <<EOL
-input {
-  beats { port => 5044 }
-}
-output {
-  elasticsearch {
-    hosts => ["http://elasticsearch:9200"]
-    index => "flask-app-logs-%{+YYYY.MM.dd}"
-  }
-}
-EOL
-
-                    docker compose -f docker-compose.override.yml up -d
-                '''
-            }
-        }
-
-        stage('Configure Flask Logging to ELK') {
-            steps {
-                script {
-                    def publicIp = sh(script: "terraform -chdir=../${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
-                    writeFile file: 'app/logging_config.py', text: """
-import logging
-import logstash
-
-host = '${publicIp}'
-test_logger = logging.getLogger('python-logstash-logger')
-test_logger.setLevel(logging.INFO)
-test_logger.addHandler(logstash.TCPLogstashHandler(host, 5044, version=1))
-"""
                 }
             }
         }
@@ -164,7 +116,7 @@ test_logger.addHandler(logstash.TCPLogstashHandler(host, 5044, version=1))
                     def ready = false
 
                     for (int i = 0; i < maxRetries; i++) {
-                        def result = sh(script: 'curl -sf http://localhost:8777 || true', returnStatus: true)
+                        def result = sh(script: "curl -sf http://${env.PUBLIC_IP}:8777 || true", returnStatus: true)
                         if (result == 0) {
                             echo "App is ready"
                             ready = true
@@ -199,6 +151,11 @@ test_logger.addHandler(logstash.TCPLogstashHandler(host, 5044, version=1))
         always {
             echo "Ensuring all containers are running"
             sh 'docker compose up -d || true'
+            // Remove temp private key file for security
+            sh 'rm -f ansible/temp_key.pem || true'
         }
     }
 }
+
+}
+
