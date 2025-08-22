@@ -58,10 +58,14 @@ pipeline {
                     sh 'chmod 600 private_key.pem'
 
                     // Generate inventory
-                    writeFile file: 'inventory_generated.ini', text: """
-[flask_app]
-${publicIp} ansible_user=ec2-user ansible_ssh_private_key_file=private_key.pem
-"""
+                    writeFile file: 'inventory_generated.ini', text: """[flask_app]
+         ${publicIp}
+    
+         [flask_app:vars]
+         ansible_user=ec2-user
+         ansible_ssh_private_key_file=private_key.pem
+         """
+
                 }
             }
         }
@@ -95,8 +99,9 @@ ${publicIp} ansible_user=ec2-user ansible_ssh_private_key_file=private_key.pem
                 sh '''
                     python3 -m venv --copies venv
                     . venv/bin/activate
-                     pip install --upgrade pip
-                    pip install -r requirements.txt
+                    pip install --upgrade pip --break-system-packages
+                    pip install -r requirements.txt --break-system-packages
+                   
                     pytest tests/selenium
                 '''
             }
@@ -111,5 +116,6 @@ ${publicIp} ansible_user=ec2-user ansible_ssh_private_key_file=private_key.pem
         }
     }
 }
+
 
 
