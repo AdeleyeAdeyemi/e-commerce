@@ -9,7 +9,7 @@ PUBLIC_IP=$(terraform -chdir=terraform output -raw public_ip | tr -d '[:space:]'
 # -----------------------------
 # Get private key from Terraform output
 # -----------------------------
-terraform -chdir=terraform output -raw terraform_key_pem > terraform-key.pem
+terraform -chdir=terraform output -raw com-new.pem > com-new.pem
 
 # Ensure correct permissions
 chmod 600 terraform-key.pem
@@ -17,8 +17,8 @@ chmod 600 terraform-key.pem
 # -----------------------------
 # Move private key to WSL home for proper access
 # -----------------------------
-KEY_WSL_PATH="$HOME/terraform-key.pem"
-cp terraform-key.pem "$KEY_WSL_PATH"
+KEY_WSL_PATH="$HOME/com-new.pem"
+cp com-new.pem "$KEY_WSL_PATH"
 chmod 600 "$KEY_WSL_PATH"
 
 # -----------------------------
@@ -43,3 +43,4 @@ sed -i 's/\r$//' inventory_generated.yml
 # -----------------------------
 echo "Inventory file generated:"
 cat inventory_generated.yml
+
