@@ -1,25 +1,45 @@
 #!/bin/bash
 set -e
 
-# Get the public IP from Terraform and remove extra whitespace/newlines
+# -----------------------------
+# Get public IP and strip whitespace/newlines
+# -----------------------------
 PUBLIC_IP=$(terraform -chdir=terraform output -raw public_ip | tr -d '[:space:]')
 
-# Get the private key from Terraform output
+# -----------------------------
+# Get private key from Terraform output
+# -----------------------------
 terraform -chdir=terraform output -raw terraform_key_pem > terraform-key.pem
+
+# Ensure correct permissions
 chmod 600 terraform-key.pem
 
-# Get absolute path to the private key
-PRIVATE_KEY_PATH=$(realpath terraform-key.pem)
+# -----------------------------
+# Move private key to WSL home for proper access
+# -----------------------------
+KEY_WSL_PATH="$HOME/terraform-key.pem"
+cp terraform-key.pem "$KEY_WSL_PATH"
+chmod 600 "$KEY_WSL_PATH"
 
-# Generate the Ansible inventory file
+# -----------------------------
+# Generate inventory file with proper YAML syntax
+# -----------------------------
 cat > inventory_generated.yml <<EOL
 all:
   hosts:
-    "${PUBLIC_IP}":
+    ${PUBLIC_IP}:
       ansible_user: ec2-user
-      ansible_ssh_private_key_file: ${PRIVATE_KEY_PATH}
+      ansible_ssh_private_key_file: ${KEY_WSL_PATH}
       ansible_python_interpreter: /usr/bin/python3
 EOL
 
-echo "Inventory generated successfully:"
+# -----------------------------
+# Ensure LF line endings (very important on Windows/WSL)
+# -----------------------------
+sed -i 's/\r$//' inventory_generated.yml
+
+# -----------------------------
+# Display result
+# -----------------------------
+echo "Inventory file generated:"
 cat inventory_generated.yml
