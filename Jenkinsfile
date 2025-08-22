@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     environment {
-        TF_VAR_region = 'eu-west-2'  // Terraform AWS region
-        ANSIBLE_DIR = 'ansible'
+        TF_VAR_region = 'eu-west-2'
         TERRAFORM_DIR = 'terraform'
+        ANSIBLE_DIR = 'ansible'
     }
 
     stages {
@@ -14,10 +14,11 @@ pipeline {
             }
         }
 
-        stage('Terraform Init') {
+        stage('Terraform Init & Plan') {
             steps {
                 dir("${TERRAFORM_DIR}") {
                     sh 'terraform init'
+                    sh 'terraform plan'
                 }
             }
         }
@@ -31,17 +32,17 @@ pipeline {
                         passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                     )
                 ]) {
-                    sshagent(['terraform-key']) {
+                    sshagent(['terraform-key']) {  // Jenkins-managed SSH key
                         dir("${TERRAFORM_DIR}") {
                             sh '''
                                 export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                                 export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 
+                                # Apply Terraform without specifying a PEM file
                                 terraform apply -auto-approve \
                                     -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
                                     -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
-                                    -var="key_name=terraform-generated-key" \
-                                    -var="private_key_path=${HOME}/.ssh/id_rsa"
+                                    -var="key_name=terraform-generated-key"
                             '''
                         }
                     }
@@ -57,8 +58,7 @@ pipeline {
                         writeFile file: 'inventory.ini', text: """[web]
 ${publicIp} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/python3
 """
-                        sh 'dos2unix inventory.ini'
-                        sh 'dos2unix playbook.yml'
+                        sh 'dos2unix inventory.ini playbook.yml'
                         sh 'cat inventory.ini'
                     }
                 }
@@ -79,14 +79,14 @@ ${publicIp} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/python3
             steps {
                 sh 'chmod +x build.sh && ./build.sh'
                 script {
-                    def result = sh(script: 'docker compose build --no-cache', returnStatus: true)
-                    if (result != 0) {
+                    def buildResult = sh(script: 'docker compose build --no-cache', returnStatus: true)
+                    if (buildResult != 0) {
                         sh 'docker compose logs || true'
                         error 'Docker Compose build failed'
                     }
 
-                    result = sh(script: 'docker compose up -d', returnStatus: true)
-                    if (result != 0) {
+                    def upResult = sh(script: 'docker compose up -d', returnStatus: true)
+                    if (upResult != 0) {
                         sh 'docker compose logs || true'
                         error 'Failed to start containers'
                     }
@@ -94,7 +94,7 @@ ${publicIp} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/python3
             }
         }
 
-        stage('Verify Containers & App') {
+        stage('Verify App & Containers') {
             steps {
                 sh '''
                     echo "Running containers:"
@@ -103,13 +103,13 @@ ${publicIp} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/python3
                     echo "Flask container logs:"
                     docker logs $(docker ps -q --filter "name=ecommerce-app") || true
 
-                    echo "Installed Python packages:"
+                    echo "Python packages in Flask container:"
                     docker exec $(docker ps -q --filter "name=ecommerce-app") pip list || true
                 '''
             }
         }
 
-        stage('Wait for App') {
+        stage('Wait for App Ready') {
             steps {
                 script {
                     def maxRetries = 20
@@ -155,6 +155,8 @@ ${publicIp} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/python3
         }
     }
 }
+
+
 
 
 
