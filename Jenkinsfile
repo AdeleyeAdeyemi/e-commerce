@@ -1,4 +1,4 @@
-
+pipeline {
     agent any
 
     environment {
@@ -50,24 +50,22 @@
         stage('Prepare Ansible Inventory') {
             steps {
                 script {
-                    def publicIp = sh(script: "terraform output -raw public_ip", returnStdout: true).trim()
-                    def privateKey = sh(script: "terraform output -raw private_key_pem", returnStdout: true).trim()
+                    def publicIp = sh(script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
+                    def privateKey = sh(script: "terraform -chdir=${TERRAFORM_DIR} output -raw private_key_pem", returnStdout: true).trim()
 
                     // Save private key
                     writeFile file: 'private_key.pem', text: privateKey
                     sh 'chmod 600 private_key.pem'
                     
-                    writeFile file: "inventory_generated.ini", text: """
-         all:
-          hosts:
-            ${publicIp}:
-              ansible_user: ec2-user
-              ansible_ssh_private_key_file: private_key.pem
-              ansible_python_interpreter: /usr/bin/python3
-                            [
-        """
-
-
+                    // ✅ Write correct YAML inventory
+                    writeFile file: "inventory_generated.yml", text: """
+all:
+  hosts:
+    ${publicIp}:
+      ansible_user: ec2-user
+      ansible_ssh_private_key_file: private_key.pem
+      ansible_python_interpreter: /usr/bin/python3
+"""
                 }
             }
         }
@@ -92,19 +90,18 @@
 
         stage('Wait for App Ready') {
             steps {
-                sh 'sleep 30'  // simple wait, can replace with health check
+                sh 'sleep 30'
             }
         }
 
         stage('Run Selenium Tests') {
             steps {
                 sh '''
-                        python3 -m venv venv
+                    python3 -m venv venv
                     ./venv/bin/pip install --upgrade pip --break-system-packages
                     ./venv/bin/pip install -r requirements.txt --break-system-packages
                     ./venv/bin/pip install pytest selenium --break-system-packages
                     ./venv/bin/pytest tests/selenium
-                      
                 '''
             }
         }
@@ -118,8 +115,5 @@
         }
     }
 }
-
-
-
 
 
