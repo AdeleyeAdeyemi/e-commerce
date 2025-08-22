@@ -2,7 +2,8 @@ pipeline {
     agent any
 
     environment {
-        TF_VAR_region = 'eu-west-2'  // You can set other global Terraform variables here
+        TF_VAR_region = 'eu-west-2'  // Global Terraform variable
+        ELK_HOST = 'logstash'         // For Flask app logging
     }
 
     stages {
@@ -24,8 +25,8 @@ pipeline {
                             terraform apply -auto-approve \
                                 -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
                                 -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
-                                -var="key_name=your-key-name" \
-                                -var="private_key_path=/path/to/your/private-key.pem"
+                                -var="key_name=terraform-generated-key" \
+                                -var="private_key_path=/path/to/terraform-generated-key.pem"
                         '''
                     }
                 }
@@ -35,9 +36,7 @@ pipeline {
         stage('Configure & Deploy with Ansible') {
             steps {
                 dir('ansible') {
-                    sh '''
-                        ansible-playbook -i inventory.ini playbook.yml
-                    '''
+                    sh 'ansible-playbook -i inventory.ini playbook.yml'
                 }
             }
         }
@@ -48,7 +47,7 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build Docker Images') {
             steps {
                 script {
                     def result = sh(script: 'docker compose build --no-cache', returnStatus: true)
@@ -66,23 +65,23 @@ pipeline {
                     def result = sh(script: 'docker compose up -d', returnStatus: true)
                     if (result != 0) {
                         sh 'docker compose logs || true'
-                        error 'Failed to start containers with Docker Compose'
+                        error 'Failed to start containers'
                     }
                 }
             }
         }
 
-        stage('Verify Docker & Flask Status') {
+        stage('Verify Containers & Flask Status') {
             steps {
                 sh '''
                     echo "Running containers:"
                     docker ps
 
                     echo "Flask container logs:"
-                    docker logs $(docker ps -q --filter "name=e-commerce") || true
+                    docker logs $(docker ps -q --filter "name=ecommerce-app") || true
 
-                    echo "Installed Python packages:"
-                    docker exec $(docker ps -q --filter "name=e-commerce") pip list || true
+                    echo "Installed Python packages in Flask container:"
+                    docker exec $(docker ps -q --filter "name=ecommerce-app") pip list || true
                 '''
             }
         }
@@ -95,7 +94,7 @@ pipeline {
                     def ready = false
 
                     for (int i = 0; i < maxRetries; i++) {
-                        def result = sh(script: 'curl -sf http://localhost:8977 || true', returnStatus: true)
+                        def result = sh(script: 'curl -sf http://localhost:8777 || true', returnStatus: true)
                         if (result == 0) {
                             echo "App is ready"
                             ready = true
@@ -107,19 +106,20 @@ pipeline {
                     }
 
                     if (!ready) {
-                        sh 'docker logs $(docker ps -q --filter "name=e-commerce") || true'
+                        sh 'docker logs $(docker ps -q --filter "name=ecommerce-app") || true'
                         error "App did not become ready in time"
                     }
                 }
             }
         }
 
-        stage('Test with Selenium') {
+        stage('Run Selenium Tests') {
             steps {
                 sh '''
                     python3 -m venv venv
                     . venv/bin/activate
                     pip install --upgrade pip selenium
+                    # Add your Selenium test commands here
                 '''
             }
         }
@@ -127,9 +127,11 @@ pipeline {
 
     post {
         always {
-            echo "Cleaning up / restarting Docker Compose in post step"
+            echo "Ensuring containers are up"
             sh 'docker compose up -d || true'
         }
     }
 }
+
+
 
