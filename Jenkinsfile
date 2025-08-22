@@ -48,25 +48,25 @@ pipeline {
         }
 
         stage('Prepare Ansible Inventory') {
-    steps {
-        script {
-            def publicIp = sh(
-                script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
-                returnStdout: true
-            ).trim()
-            
-            // Get private key directly from Terraform output
-            def privateKey = sh(
-                script: "terraform -chdir=${TERRAFORM_DIR} output -raw terraform_key_pem",
-                returnStdout: true
-            ).trim()
+            steps {
+                script {
+                    def publicIp = sh(
+                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
+                        returnStdout: true
+                    ).trim()
+                    
+                    // Get private key directly from Terraform output
+                    def privateKey = sh(
+                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw terraform_key_pem",
+                        returnStdout: true
+                    ).trim()
 
-            // Write private key to file with correct permissions
-            writeFile file: 'private_key.pem', text: privateKey
-            sh 'chmod 600 private_key.pem'
+                    // Write private key to file with correct permissions
+                    writeFile file: 'private_key.pem', text: privateKey
+                    sh 'chmod 600 private_key.pem'
 
-            // Write Ansible inventory
-            def inventory = """
+                    // Write Ansible inventory
+                    def inventory = """
 web:
   hosts:
     ${publicIp}:
@@ -74,8 +74,7 @@ web:
       ansible_ssh_private_key_file: private_key.pem
       ansible_python_interpreter: /usr/bin/python3
 """
-            writeFile file: 'inventory_generated.yml', text: inventory
-
+                    writeFile file: 'inventory_generated.yml', text: inventory
                 }
             }
         }
@@ -124,7 +123,6 @@ web:
         }
     }
 }
-
 
 
 
