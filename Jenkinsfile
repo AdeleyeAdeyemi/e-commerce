@@ -20,19 +20,21 @@ pipeline {
                 }
             }
         }
-        stage('Remove orphaned SG from state') {
-    steps {
-        dir('terraform') {
-            sh '''
-                # Remove old allow_ssh SG from Terraform state if it exists
-                terraform state list | grep aws_security_group.allow_ssh && \
-                terraform state rm aws_security_group.allow_ssh || \
-                echo "No orphaned SG to remove"
-            '''
-        }
-    }
-}
 
+        stage('Remove orphaned SG from state') {
+            steps {
+                dir('terraform') {
+                    sh '''
+                        if terraform state list | grep -q aws_security_group.allow_ssh; then
+                            echo "Removing orphaned SG from Terraform state..."
+                            terraform state rm aws_security_group.allow_ssh || true
+                        else
+                            echo "No orphaned SG found in Terraform state."
+                        fi
+                    '''
+                }
+            }
+        }
 
         stage('Import SG if exists') {
             steps {
@@ -78,103 +80,9 @@ pipeline {
         stage('Configure & Deploy with Ansible') {
             steps {
                 dir('ansible') {
-                    sh 'ansible-playbook -i inventory.ini playbook.yml'
-                }
-            }
-        }
+                    sh 'ansi
 
-        stage('Build App') {
-            steps {
-                sh 'chmod +x build.sh && ./build.sh'
-            }
-        }
-
-        stage('Build Docker Images') {
-            steps {
-                script {
-                    def result = sh(script: 'docker compose build --no-cache', returnStatus: true)
-                    if (result != 0) {
-                        sh 'docker compose logs || true'
-                        error 'Docker Compose build failed'
-                    }
-                }
-            }
-        }
-
-        stage('Run Containers') {
-            steps {
-                script {
-                    def result = sh(script: 'docker compose up -d', returnStatus: true)
-                    if (result != 0) {
-                        sh 'docker compose logs || true'
-                        error 'Failed to start containers'
-                    }
-                }
-            }
-        }
-
-        stage('Verify Containers & Flask Status') {
-            steps {
-                sh '''
-                    echo "Running containers:"
-                    docker ps
-
-                    echo "Flask container logs:"
-                    docker logs $(docker ps -q --filter "name=ecommerce-app") || true
-
-                    echo "Installed Python packages in Flask container:"
-                    docker exec $(docker ps -q --filter "name=ecommerce-app") pip list || true
-                '''
-            }
-        }
-
-        stage('Wait for App to be Ready') {
-            steps {
-                script {
-                    def maxRetries = 20
-                    def waitSeconds = 6
-                    def ready = false
-
-                    for (int i = 0; i < maxRetries; i++) {
-                        def result = sh(script: 'curl -sf http://localhost:8777 || true', returnStatus: true)
-                        if (result == 0) {
-                            echo "App is ready"
-                            ready = true
-                            break
-                        } else {
-                            echo "App not ready, waiting ${waitSeconds}s..."
-                            sleep(waitSeconds)
-                        }
-                    }
-
-                    if (!ready) {
-                        sh 'docker logs $(docker ps -q --filter "name=ecommerce-app") || true'
-                        error "App did not become ready in time"
-                    }
-                }
-            }
-        }
-
-        stage('Run Selenium Tests') {
-            steps {
-                sh '''
-                    python3 -m venv venv
-                    . venv/bin/activate
-                    pip install --upgrade pip selenium
-                    # Add your Selenium test commands here
-                '''
-            }
-        }
-    }
-
-    post {
-        always {
-            echo "Ensuring containers are up"
-            sh 'docker compose up -d || true'
-        }
-    }
-}
-
+                    
 
 
 
