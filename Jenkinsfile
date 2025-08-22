@@ -14,16 +14,7 @@ pipeline {
             }
         }
 
-        stage('Terraform Init & Plan') {
-            steps {
-                dir("${TERRAFORM_DIR}") {
-                    sh 'terraform init'
-                    sh 'terraform plan'
-                }
-            }
-        }
-
-        stage('Provision Infrastructure') {
+        stage('Terraform Init & Apply') {
             steps {
                 withCredentials([
                     usernamePassword(
@@ -32,19 +23,16 @@ pipeline {
                         passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                     )
                 ]) {
-                    sshagent(['terraform-key']) {  // Jenkins-managed SSH key
-                        dir("${TERRAFORM_DIR}") {
-                            sh '''
-                                export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-                                export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-
-                                # Apply Terraform without specifying a PEM file
-                                terraform apply -auto-approve \
-                                    -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
-                                    -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
-                                    -var="key_name=terraform-generated-key"
-                            '''
-                        }
+                    dir("${TERRAFORM_DIR}") {
+                        sh """
+                            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+                            terraform init
+                            terraform apply -auto-approve \
+                                -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
+                                -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
+                                -var="key_name=terraform-generated-key"
+                        """
                     }
                 }
             }
@@ -56,7 +44,7 @@ pipeline {
                     script {
                         def publicIp = sh(script: "terraform -chdir=../${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
                         writeFile file: 'inventory.ini', text: """[web]
-${publicIp} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/python3
+${publicIp} ansible_user=ec2-user ansible_private_key_file=../${TERRAFORM_DIR}/terraform-generated-key.pem ansible_python_interpreter=/usr/bin/python3
 """
                         sh 'dos2unix inventory.ini playbook.yml'
                         sh 'cat inventory.ini'
@@ -67,10 +55,8 @@ ${publicIp} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/python3
 
         stage('Configure & Deploy with Ansible') {
             steps {
-                sshagent(['terraform-key']) {
-                    dir("${ANSIBLE_DIR}") {
-                        sh 'ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.ini playbook.yml'
-                    }
+                dir("${ANSIBLE_DIR}") {
+                    sh 'ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.ini playbook.yml'
                 }
             }
         }
@@ -90,6 +76,67 @@ ${publicIp} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/python3
                         sh 'docker compose logs || true'
                         error 'Failed to start containers'
                     }
+                }
+            }
+        }
+
+        stage('Deploy ELK Stack') {
+            steps {
+                sh '''
+                    cat > docker-compose.override.yml <<EOL
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.1
+    container_name: logstash
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    ports:
+      - "5044:5044"
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.1
+    container_name: kibana
+    ports:
+      - "5601:5601"
+EOL
+
+                    cat > logstash.conf <<EOL
+input {
+  beats { port => 5044 }
+}
+output {
+  elasticsearch {
+    hosts => ["http://elasticsearch:9200"]
+    index => "flask-app-logs-%{+YYYY.MM.dd}"
+  }
+}
+EOL
+
+                    docker compose -f docker-compose.override.yml up -d
+                '''
+            }
+        }
+
+        stage('Configure Flask Logging to ELK') {
+            steps {
+                script {
+                    def publicIp = sh(script: "terraform -chdir=../${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
+                    writeFile file: 'app/logging_config.py', text: """
+import logging
+import logstash
+
+host = '${publicIp}'
+test_logger = logging.getLogger('python-logstash-logger')
+test_logger.setLevel(logging.INFO)
+test_logger.addHandler(logstash.TCPLogstashHandler(host, 5044, version=1))
+"""
                 }
             }
         }
@@ -155,11 +202,3 @@ ${publicIp} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/python3
         }
     }
 }
-
-
-
-
-
-
-
-
