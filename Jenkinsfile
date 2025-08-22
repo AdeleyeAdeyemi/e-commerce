@@ -4,7 +4,7 @@ pipeline {
     environment {
         TF_VAR_region = 'eu-west-2'
         TERRAFORM_DIR = 'terraform'
-        ANSIBLE_DIR   = 'ansible'
+        ANSIBLE_DIR = 'ansible'
     }
 
     stages {
@@ -14,23 +14,21 @@ pipeline {
             }
         }
 
-        stage('Terraform Init & Plan') {
+        stage('Terraform Init & Apply') {
             steps {
-                dir("${TERRAFORM_DIR}") {
-                    sh 'terraform init'
-                    sh 'terraform plan'
-                }
-            }
-        }
-
-        stage('Provision Infrastructure') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'aws-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'aws-credentials',
+                        usernameVariable: 'AWS_ACCESS_KEY_ID',
+                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                    )
+                ]) {
                     dir("${TERRAFORM_DIR}") {
                         sh """
                             export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                             export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 
+                            terraform init
                             terraform apply -auto-approve \
                                 -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
                                 -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
@@ -41,25 +39,32 @@ pipeline {
             }
         }
 
-        stage('Prepare Ansible Inventory & Key') {
+        stage('Fetch Terraform Outputs') {
+            steps {
+                script {
+                    // Get the public IP of the EC2 instance
+                    env.PUBLIC_IP = sh(
+                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
+                        returnStdout: true
+                    ).trim()
+
+                    // Get private key PEM content (do NOT write to disk)
+                    env.PRIVATE_KEY_PEM = sh(
+                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw private_key_pem",
+                        returnStdout: true
+                    ).trim()
+                }
+            }
+        }
+
+        stage('Prepare Ansible Inventory') {
             steps {
                 dir("${ANSIBLE_DIR}") {
-                    script {
-                        // Capture Terraform outputs
-                        env.PUBLIC_IP = sh(script: "terraform -chdir=../${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
-                        env.PRIVATE_KEY = sh(script: "terraform -chdir=../${TERRAFORM_DIR} output -raw private_key_pem", returnStdout: true).trim()
-
-                        // Write inventory
-                        writeFile file: 'inventory.ini', text: """[web]
+                    writeFile file: 'inventory.ini', text: """[web]
 ${env.PUBLIC_IP} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/python3
 """
-                        sh 'dos2unix inventory.ini playbook.yml'
-                        sh 'cat inventory.ini'
-
-                        // Write private key to temp file (in-memory use only, not committed)
-                        writeFile file: 'temp_key.pem', text: env.PRIVATE_KEY
-                        sh 'chmod 600 temp_key.pem'
-                    }
+                    sh 'dos2unix inventory.ini playbook.yml'
+                    sh 'cat inventory.ini'
                 }
             }
         }
@@ -67,8 +72,17 @@ ${env.PUBLIC_IP} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/pytho
         stage('Configure & Deploy with Ansible') {
             steps {
                 dir("${ANSIBLE_DIR}") {
-                    sshagent(['temp_key.pem']) {
-                        sh 'ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.ini playbook.yml'
+                    // Use in-memory private key with ssh-agent
+                    withEnv(["PRIVATE_KEY_FILE=${env.WORKSPACE}/temp_ssh_key"]) {
+                        writeFile file: env.PRIVATE_KEY_FILE, text: env.PRIVATE_KEY_PEM
+                        sh 'chmod 600 $PRIVATE_KEY_FILE'
+
+                        sshagent([env.PRIVATE_KEY_FILE]) {
+                            sh 'ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.ini playbook.yml'
+                        }
+
+                        // Remove ephemeral key
+                        sh 'rm -f $PRIVATE_KEY_FILE'
                     }
                 }
             }
@@ -151,11 +165,8 @@ ${env.PUBLIC_IP} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/pytho
         always {
             echo "Ensuring all containers are running"
             sh 'docker compose up -d || true'
-            // Remove temp private key file for security
-            sh 'rm -f ansible/temp_key.pem || true'
         }
     }
 }
 
-}
 
