@@ -1,38 +1,66 @@
+##############################
+# VARIABLES
+##############################
+variable "region" {
+  type        = string
+  description = "AWS region"
+}
+
+variable "aws_access_key" {
+  type        = string
+  description = "AWS access key"
+}
+
+variable "aws_secret_key" {
+  type        = string
+  description = "AWS secret key"
+}
+
+variable "key_name" {
+  type        = string
+  description = "EC2 Key Pair name"
+}
+
+##############################
+# PROVIDER
+##############################
 provider "aws" {
   region     = var.region
   access_key = var.aws_access_key
   secret_key = var.aws_secret_key
 }
 
-# Generate SSH key
+##############################
+# SSH KEY
+##############################
 resource "tls_private_key" "terraform_key" {
   algorithm = "RSA"
   rsa_bits  = 4096
 }
 
-# Create AWS key pair
 resource "aws_key_pair" "terraform_key" {
   key_name   = var.key_name
   public_key = tls_private_key.terraform_key.public_key_openssh
+
+  lifecycle {
+    prevent_destroy = true  # keep key persistent across applies
+  }
 }
 
-# Security Group
+##############################
+# SECURITY GROUP
+##############################
+data "aws_vpc" "default" {
+  default = true
+}
+
 resource "aws_security_group" "flask_sg" {
   name        = "flask-app-sg"
-  description = "Allow SSH and HTTP"
+  description = "Allow SSH, Flask app, and ELK ports"
+  vpc_id      = data.aws_vpc.default.id
 
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 8777
-    to_port     = 8777
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+  lifecycle {
+    create_before_destroy = true
   }
 
   egress {
@@ -41,9 +69,61 @@ resource "aws_security_group" "flask_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = {
+    Name = "flask-app-sg"
+  }
 }
 
-# Find latest Amazon Linux 2 AMI
+# Separate rules to avoid SG replacement
+resource "aws_security_group_rule" "ssh" {
+  type              = "ingress"
+  from_port         = 22
+  to_port           = 22
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.flask_sg.id
+}
+
+resource "aws_security_group_rule" "flask_app" {
+  type              = "ingress"
+  from_port         = 8777
+  to_port           = 8777
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.flask_sg.id
+}
+
+resource "aws_security_group_rule" "elk_5044" {
+  type              = "ingress"
+  from_port         = 5044
+  to_port           = 5044
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.flask_sg.id
+}
+
+resource "aws_security_group_rule" "elk_9200" {
+  type              = "ingress"
+  from_port         = 9200
+  to_port           = 9200
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.flask_sg.id
+}
+
+resource "aws_security_group_rule" "elk_9600" {
+  type              = "ingress"
+  from_port         = 9600
+  to_port           = 9600
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.flask_sg.id
+}
+
+##############################
+# AMAZON LINUX AMI
+##############################
 data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
@@ -54,15 +134,27 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-# EC2 instance
+##############################
+# EC2 INSTANCE
+##############################
 resource "aws_instance" "flask_app" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "t2.micro"
   key_name               = aws_key_pair.terraform_key.key_name
   vpc_security_group_ids = [aws_security_group.flask_sg.id]
+  associate_public_ip_address = true  # ensure internet access
 
   tags = {
     Name = "flask-app"
   }
+
+  depends_on = [
+    aws_security_group_rule.ssh,
+    aws_security_group_rule.flask_app,
+    aws_security_group_rule.elk_5044,
+    aws_security_group_rule.elk_9200,
+    aws_security_group_rule.elk_9600
+  ]
 }
+
 
