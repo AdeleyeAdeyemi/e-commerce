@@ -13,7 +13,14 @@ variable "aws_secret_key" {
 variable "region" {
   description = "AWS region"
   type        = string
-  default     = "eu-west-2"  # London
+  default     = "eu-west-2"
+variable "region" {
+  default = "eu-west-2"
+}
+
+variable "aws_access_key" {}
+variable "aws_secret_key" {}
+# London
 }
 
 variable "key_name" {
@@ -25,5 +32,6 @@ variable "private_key_path" {
   description = "Path to the private key file"
   type        = string
 }
+
 
 
