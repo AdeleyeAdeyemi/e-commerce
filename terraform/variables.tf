@@ -25,3 +25,10 @@ variable "private_key_path" {
   description = "Path to the private key file"
   type        = string
 }
+
+variable "vpc_id" {
+  description = "VPC ID where the resources will be created"
+  type        = string
+}
+
+
