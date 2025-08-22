@@ -57,7 +57,7 @@ pipeline {
                     
                     // Get private key directly from Terraform output
                     def privateKey = sh(
-                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw terraform_key_pem",
+                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw terraform_key_pem | tr -d'\\r",
                         returnStdout: true
                     ).trim()
 
@@ -123,6 +123,7 @@ web:
         }
     }
 }
+
 
 
 
