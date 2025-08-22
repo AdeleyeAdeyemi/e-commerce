@@ -1,9 +1,11 @@
+
 pipeline {
     agent any
 
     environment {
-        TF_VAR_region = 'eu-west-2'  // Global Terraform variable
-        ELK_HOST = 'logstash'         // For Flask app logging
+        TF_VAR_region = 'eu-west-2'   // Terraform region
+        TERRAFORM_DIR = 'terraform'
+        ANSIBLE_DIR = 'ansible'
     }
 
     stages {
@@ -15,63 +17,69 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                dir('terraform') {
+                dir("${TERRAFORM_DIR}") {
                     sh 'terraform init'
-                }
-            }
-        }
-
-        stage('Remove orphaned SG from state') {
-            steps {
-                dir('terraform') {
-                    sh '''
-                        if terraform state list | grep -q aws_security_group.allow_ssh; then
-                            echo "Removing orphaned SG from Terraform state..."
-                            terraform state rm aws_security_group.allow_ssh || true
-                        else
-                            echo "No orphaned SG found in Terraform state."
-                        fi
-                    '''
-                }
-            }
-        }
-
-        stage('Import SG if exists') {
-            steps {
-                dir('terraform') {
-                    sh '''
-                        # Try to import SG if it exists in AWS
-                        SG_ID=$(aws ec2 describe-security-groups \
-                            --filters "Name=group-name,Values=flask-app-sg" \
-                            --region ${TF_VAR_region} \
-                            --query "SecurityGroups[0].GroupId" \
-                            --output text 2>/dev/null || true)
-
-                        if [ "$SG_ID" != "None" ] && [ -n "$SG_ID" ]; then
-                            echo "Found existing SG: $SG_ID, importing into Terraform state..."
-                            terraform import aws_security_group.flask_sg $SG_ID || true
-                        else
-                            echo "No existing SG found, skipping import."
-                        fi
-                    '''
                 }
             }
         }
 
         stage('Provision Infrastructure') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'aws-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    dir('terraform') {
+                // Inject AWS credentials and Terraform key from Jenkins
+                withCredentials([
+                    usernamePassword(credentialsId: 'aws-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY'),
+                    file(credentialsId: 'terraform-key', variable: 'TF_KEY_FILE')
+                ]) {
+                    dir("${TERRAFORM_DIR}") {
                         sh '''
                             export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                             export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-                            
+
                             terraform apply -auto-approve \
                                 -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
                                 -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
                                 -var="key_name=terraform-generated-key" \
-                                -var="private_key_path=/path/to/terraform-generated-key.pem"
+                                -var="private_key_path=${TF_KEY_FILE}"
                         '''
+                        script {
+                            env.NEW_PUBLIC_IP = sh(
+                                script: 'terraform output -raw public_ip',
+                                returnStdout: true
+                            ).trim()
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Prepare Ansible Inventory') {
+            steps {
+                dir("${ANSIBLE_DIR}") {
+                    sh '''
+                        mkdir -p ${ANSIBLE_DIR}
+
+                        echo "[web]
+${NEW_PUBLIC_IP} ansible_user=ec2-user ansible_ssh_private_key_file=${TF_KEY_FILE} ansible_python_interpreter=/usr/bin/python3" > inventory.ini
+
+                        dos2unix inventory.ini
+                        dos2unix playbook.yml
+                    '''
+                }
+            }
+        }
+
+        stage('Wait for SSH') {
+            steps {
+                sshagent(credentials: ['terraform-key']) {
+                    script {
+                        echo "Waiting for SSH on ${env.NEW_PUBLIC_IP}..."
+                        retry(12) {
+                            sh """
+                                nc -zv ${env.NEW_PUBLIC_IP} 22 || (echo 'SSH not ready, retrying...' && exit 1)
+                                ssh -o StrictHostKeyChecking=no -i ${TF_KEY_FILE} ec2-user@${env.NEW_PUBLIC_IP} "echo connected"
+                            """
+                            sleep 10
+                        }
                     }
                 }
             }
@@ -79,54 +87,41 @@ pipeline {
 
         stage('Configure & Deploy with Ansible') {
             steps {
-                dir('ansible') {
-                    sh 'ansible-playbook -i inventory.ini playbook.yml'
+                sshagent(credentials: ['terraform-key']) {
+                    dir("${ANSIBLE_DIR}") {
+                        sh 'ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.ini playbook.yml'
+                    }
                 }
             }
         }
 
-        stage('Build App') {
+        stage('Build & Run App with Docker') {
             steps {
                 sh 'chmod +x build.sh && ./build.sh'
-            }
-        }
 
-        stage('Build Docker Images') {
-            steps {
                 script {
-                    def result = sh(script: 'docker compose build --no-cache', returnStatus: true)
-                    if (result != 0) {
+                    def buildStatus = sh(script: 'docker compose build --no-cache', returnStatus: true)
+                    if (buildStatus != 0) {
                         sh 'docker compose logs || true'
                         error 'Docker Compose build failed'
                     }
-                }
-            }
-        }
 
-        stage('Run Containers') {
-            steps {
-                script {
-                    def result = sh(script: 'docker compose up -d', returnStatus: true)
-                    if (result != 0) {
+                    def upStatus = sh(script: 'docker compose up -d', returnStatus: true)
+                    if (upStatus != 0) {
                         sh 'docker compose logs || true'
-                        error 'Failed to start containers'
+                        error 'Docker Compose up failed'
                     }
                 }
             }
         }
 
-        stage('Verify Containers & Flask Status') {
+        stage('Verify App & Docker') {
             steps {
-                sh '''
-                    echo "Running containers:"
+                sh """
                     docker ps
-
-                    echo "Flask container logs:"
-                    docker logs $(docker ps -q --filter "name=ecommerce-app") || true
-
-                    echo "Installed Python packages in Flask container:"
-                    docker exec $(docker ps -q --filter "name=ecommerce-app") pip list || true
-                '''
+                    docker logs \$(docker ps -q --filter "name=ecommerce-app") || true
+                    docker exec \$(docker ps -q --filter "name=ecommerce-app") pip list || true
+                """
             }
         }
 
@@ -138,15 +133,13 @@ pipeline {
                     def ready = false
 
                     for (int i = 0; i < maxRetries; i++) {
-                        def result = sh(script: 'curl -sf http://localhost:8777 || true', returnStatus: true)
-                        if (result == 0) {
+                        if (sh(script: "curl -sf http://${env.NEW_PUBLIC_IP}:8777 || true", returnStatus: true) == 0) {
                             echo "App is ready"
                             ready = true
                             break
-                        } else {
-                            echo "App not ready, waiting ${waitSeconds}s..."
-                            sleep(waitSeconds)
                         }
+                        echo "App not ready, waiting ${waitSeconds}s..."
+                        sleep(waitSeconds)
                     }
 
                     if (!ready) {
@@ -171,11 +164,12 @@ pipeline {
 
     post {
         always {
-            echo "Ensuring containers are up"
+            echo "Ensuring all containers are up"
             sh 'docker compose up -d || true'
         }
     }
 }
+
 
 
 
