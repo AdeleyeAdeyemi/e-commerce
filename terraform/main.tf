@@ -1,29 +1,7 @@
 ##############################
-# VARIABLES
-##############################
-variable "region" {
-  type        = string
-  description = "AWS region"
-}
-
-variable "aws_access_key" {
-  type        = string
-  description = "AWS access key"
-}
-
-variable "aws_secret_key" {
-  type        = string
-  description = "AWS secret key"
-}
-
-variable "key_name" {
-  type        = string
-  description = "EC2 Key Pair name"
-}
-
-##############################
 # PROVIDER
 ##############################
+
 provider "aws" {
   region     = var.region
   access_key = var.aws_access_key
@@ -33,6 +11,7 @@ provider "aws" {
 ##############################
 # SSH KEY
 ##############################
+
 resource "tls_private_key" "terraform_key" {
   algorithm = "RSA"
   rsa_bits  = 4096
@@ -43,13 +22,14 @@ resource "aws_key_pair" "terraform_key" {
   public_key = tls_private_key.terraform_key.public_key_openssh
 
   lifecycle {
-    prevent_destroy = true  # keep key persistent across applies
+    prevent_destroy = true
   }
 }
 
 ##############################
 # SECURITY GROUP
 ##############################
+
 data "aws_vpc" "default" {
   default = true
 }
@@ -75,7 +55,6 @@ resource "aws_security_group" "flask_sg" {
   }
 }
 
-# Separate rules to avoid SG replacement
 resource "aws_security_group_rule" "ssh" {
   type              = "ingress"
   from_port         = 22
@@ -124,6 +103,7 @@ resource "aws_security_group_rule" "elk_9600" {
 ##############################
 # AMAZON LINUX AMI
 ##############################
+
 data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
@@ -137,12 +117,13 @@ data "aws_ami" "amazon_linux" {
 ##############################
 # EC2 INSTANCE
 ##############################
+
 resource "aws_instance" "flask_app" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "t2.micro"
   key_name               = aws_key_pair.terraform_key.key_name
   vpc_security_group_ids = [aws_security_group.flask_sg.id]
-  associate_public_ip_address = true  # ensure internet access
+  associate_public_ip_address = true
 
   tags = {
     Name = "flask-app"
@@ -156,5 +137,4 @@ resource "aws_instance" "flask_app" {
     aws_security_group_rule.elk_9600
   ]
 }
-
 
