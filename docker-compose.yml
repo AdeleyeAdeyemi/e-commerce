@@ -19,7 +19,7 @@ services:
       - "5044:5044"
       - "9600:9600"
     volumes:
-      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
     restart: unless-stopped
 
   elasticsearch:
@@ -44,3 +44,4 @@ services:
     depends_on:
       - elasticsearch
     restart: unless-stopped
+
