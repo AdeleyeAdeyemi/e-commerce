@@ -93,8 +93,9 @@ ${publicIp} ansible_user=ec2-user ansible_ssh_private_key_file=private_key.pem
         stage('Run Selenium Tests') {
             steps {
                 sh '''
-                    python3 -m venv venv
+                    python3 -m venv --copies venv
                     . venv/bin/activate
+                     pip install --upgrade pip
                     pip install -r requirements.txt
                     pytest tests/selenium
                 '''
@@ -110,4 +111,5 @@ ${publicIp} ansible_user=ec2-user ansible_ssh_private_key_file=private_key.pem
         }
     }
 }
+
 
