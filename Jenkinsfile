@@ -20,6 +20,19 @@ pipeline {
                 }
             }
         }
+        stage('Remove orphaned SG from state') {
+    steps {
+        dir('terraform') {
+            sh '''
+                # Remove old allow_ssh SG from Terraform state if it exists
+                terraform state list | grep aws_security_group.allow_ssh && \
+                terraform state rm aws_security_group.allow_ssh || \
+                echo "No orphaned SG to remove"
+            '''
+        }
+    }
+}
+
 
         stage('Import SG if exists') {
             steps {
@@ -161,6 +174,7 @@ pipeline {
         }
     }
 }
+
 
 
 
