@@ -1,17 +1,31 @@
+# Variables
+variable "sg_name" {
+  description = "Name of the security group for Flask + ELK"
+  type        = string
+  default     = "flask-app-sg"
+}
+
+variable "instance_type" {
+  description = "EC2 instance type"
+  type        = string
+  default     = "t2.micro"
+}
+
+# Provider
 provider "aws" {
   region     = var.region
   access_key = var.aws_access_key
   secret_key = var.aws_secret_key
 }
 
-# Use the default VPC instead of hardcoding an ID
+# Use the default VPC
 data "aws_vpc" "default" {
   default = true
 }
 
 # Security Group for Flask + ELK
 resource "aws_security_group" "flask_sg" {
-  name        = "flask-app-sg"
+  name        = var.sg_name
   description = "Allow SSH, Flask app, and ELK ports"
   vpc_id      = data.aws_vpc.default.id
 
@@ -61,6 +75,10 @@ resource "aws_security_group" "flask_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = {
+    Name = var.sg_name
+  }
 }
 
 # Get Amazon Linux 2 AMI
@@ -94,13 +112,14 @@ resource "aws_key_pair" "generated_key" {
 # EC2 Instance
 resource "aws_instance" "flask_app" {
   ami                         = data.aws_ami.amazon_linux.id
-  instance_type               = "t2.micro"
+  instance_type               = var.instance_type
   key_name                    = aws_key_pair.generated_key.key_name
   vpc_security_group_ids      = [aws_security_group.flask_sg.id]
   associate_public_ip_address = true
 
   tags = {
     Name = "flask-e-commerce-app"
+    App  = "Flask"
   }
 
   # Write public IP into Ansible inventory
@@ -110,12 +129,16 @@ resource "aws_instance" "flask_app" {
 }
 
 # Outputs
-output "private_key_pem" {
-  value     = tls_private_key.my_key.private_key_pem
-  sensitive = true
+output "flask_app_public_ip" {
+  description = "Public IP of the Flask EC2 instance"
+  value       = aws_instance.flask_app.public_ip
 }
 
-output "flask_app_public_ip" {
-  value = aws_instance.flask_app.public_ip
+output "private_key_pem" {
+  description = "Private key (PEM) generated for SSH"
+  value       = tls_private_key.my_key.private_key_pem
+  sensitive   = true
 }
+
+
 
