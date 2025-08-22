@@ -8,23 +8,6 @@ provider "aws" {
 }
 
 ##############################
-# SSH KEY
-##############################
-resource "tls_private_key" "terraform_key" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
-}
-
-resource "aws_key_pair" "terraform_key" {
-  key_name   = var.key_name
-  public_key = tls_private_key.terraform_key.public_key_openssh
-
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
-##############################
 # SECURITY GROUP
 ##############################
 data "aws_vpc" "default" {
@@ -102,17 +85,20 @@ data "aws_ami" "amazon_linux" {
 resource "aws_instance" "flask_app" {
   ami                         = data.aws_ami.amazon_linux.id
   instance_type               = "t2.micro"
-  key_name                    = aws_key_pair.terraform_key.key_name
+  key_name                    = var.key_name   # Use the key passed from Jenkins
   vpc_security_group_ids      = [aws_security_group.flask_sg.id]
   associate_public_ip_address = true
 
   tags = {
     Name = "flask-app"
   }
+}
 
-  depends_on = [
-    aws_security_group.flask_sg
-  ]
+##############################
+# OUTPUTS
+##############################
+output "instance_public_ip" {
+  value = aws_instance.flask_app.public_ip
 }
 
 
