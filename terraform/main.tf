@@ -1,27 +1,4 @@
 ##############################
-# VARIABLES
-##############################
-variable "region" {
-  type        = string
-  description = "AWS region"
-}
-
-variable "aws_access_key" {
-  type        = string
-  description = "AWS access key"
-}
-
-variable "aws_secret_key" {
-  type        = string
-  description = "AWS secret key"
-}
-
-variable "key_name" {
-  type        = string
-  description = "EC2 Key Pair name"
-}
-
-##############################
 # PROVIDER
 ##############################
 provider "aws" {
@@ -59,7 +36,6 @@ resource "aws_security_group" "flask_sg" {
   description = "Allow SSH, Flask app, and ELK ports"
   vpc_id      = data.aws_vpc.default.id
 
-  # Ingress rules
   ingress {
     from_port   = 22
     to_port     = 22
@@ -95,7 +71,6 @@ resource "aws_security_group" "flask_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Egress rules
   egress {
     from_port   = 0
     to_port     = 0
@@ -125,10 +100,10 @@ data "aws_ami" "amazon_linux" {
 # EC2 INSTANCE
 ##############################
 resource "aws_instance" "flask_app" {
-  ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = "t2.micro"
-  key_name               = aws_key_pair.terraform_key.key_name
-  vpc_security_group_ids = [aws_security_group.flask_sg.id]
+  ami                         = data.aws_ami.amazon_linux.id
+  instance_type               = "t2.micro"
+  key_name                    = aws_key_pair.terraform_key.key_name
+  vpc_security_group_ids      = [aws_security_group.flask_sg.id]
   associate_public_ip_address = true
 
   tags = {
@@ -139,3 +114,5 @@ resource "aws_instance" "flask_app" {
     aws_security_group.flask_sg
   ]
 }
+
+
