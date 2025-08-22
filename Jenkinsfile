@@ -14,7 +14,16 @@ pipeline {
             }
         }
 
-        stage('Terraform Init & Apply') {
+        stage('Terraform Init & Plan') {
+            steps {
+                dir("${TERRAFORM_DIR}") {
+                    sh 'terraform init'
+                    sh 'terraform plan -out=tfplan'
+                }
+            }
+        }
+
+        stage('Provision Infrastructure') {
             steps {
                 withCredentials([
                     usernamePassword(
@@ -24,35 +33,14 @@ pipeline {
                     )
                 ]) {
                     dir("${TERRAFORM_DIR}") {
-                        sh """
-                            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+                        // Avoid Groovy interpolation for secrets
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 
-                            terraform init
-                            terraform apply -auto-approve \
-                                -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
-                                -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
-                                -var="key_name=terraform-generated-key"
-                        """
+                            terraform apply -auto-approve tfplan
+                        '''
                     }
-                }
-            }
-        }
-
-        stage('Fetch Terraform Outputs') {
-            steps {
-                script {
-                    // Get the public IP of the EC2 instance
-                    env.PUBLIC_IP = sh(
-                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
-                        returnStdout: true
-                    ).trim()
-
-                    // Get private key PEM content (do NOT write to disk)
-                    env.PRIVATE_KEY_PEM = sh(
-                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw private_key_pem",
-                        returnStdout: true
-                    ).trim()
                 }
             }
         }
@@ -60,29 +48,27 @@ pipeline {
         stage('Prepare Ansible Inventory') {
             steps {
                 dir("${ANSIBLE_DIR}") {
-                    writeFile file: 'inventory.ini', text: """[web]
-${env.PUBLIC_IP} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/python3
+                    script {
+                        def publicIp = sh(
+                            script: "terraform -chdir=../${TERRAFORM_DIR} output -raw flask_app_public_ip",
+                            returnStdout: true
+                        ).trim()
+
+                        writeFile file: 'inventory.ini', text: """[web]
+${publicIp} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/python3
 """
-                    sh 'dos2unix inventory.ini playbook.yml'
-                    sh 'cat inventory.ini'
+                        sh 'dos2unix inventory.ini playbook.yml'
+                        sh 'cat inventory.ini'
+                    }
                 }
             }
         }
 
         stage('Configure & Deploy with Ansible') {
             steps {
-                dir("${ANSIBLE_DIR}") {
-                    // Use in-memory private key with ssh-agent
-                    withEnv(["PRIVATE_KEY_FILE=${env.WORKSPACE}/temp_ssh_key"]) {
-                        writeFile file: env.PRIVATE_KEY_FILE, text: env.PRIVATE_KEY_PEM
-                        sh 'chmod 600 $PRIVATE_KEY_FILE'
-
-                        sshagent([env.PRIVATE_KEY_FILE]) {
-                            sh 'ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.ini playbook.yml'
-                        }
-
-                        // Remove ephemeral key
-                        sh 'rm -f $PRIVATE_KEY_FILE'
+                sshagent(['terraform-key']) {
+                    dir("${ANSIBLE_DIR}") {
+                        sh 'ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.ini playbook.yml'
                     }
                 }
             }
@@ -130,7 +116,7 @@ ${env.PUBLIC_IP} ansible_user=ec2-user ansible_python_interpreter=/usr/bin/pytho
                     def ready = false
 
                     for (int i = 0; i < maxRetries; i++) {
-                        def result = sh(script: "curl -sf http://${env.PUBLIC_IP}:8777 || true", returnStatus: true)
+                        def result = sh(script: 'curl -sf http://localhost:8777 || true', returnStatus: true)
                         if (result == 0) {
                             echo "App is ready"
                             ready = true
