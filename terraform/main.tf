@@ -4,11 +4,16 @@ provider "aws" {
   secret_key = var.aws_secret_key
 }
 
-# Create Security Group for Flask + ELK access
+# Use the default VPC instead of hardcoding an ID
+data "aws_vpc" "default" {
+  default = true
+}
+
+# Security Group for Flask + ELK
 resource "aws_security_group" "flask_sg" {
   name        = "flask-app-sg"
   description = "Allow SSH, Flask app, and ELK ports"
-  vpc_id      = "vpc-0d1eaae379d646134" # make sure you have this variable
+  vpc_id      = data.aws_vpc.default.id
 
   ingress {
     from_port   = 22
@@ -58,6 +63,7 @@ resource "aws_security_group" "flask_sg" {
   }
 }
 
+# Get Amazon Linux 2 AMI
 data "aws_ami" "amazon_linux" {
   most_recent = true
 
@@ -81,10 +87,11 @@ resource "tls_private_key" "my_key" {
 }
 
 resource "aws_key_pair" "generated_key" {
-  key_name   = "terraform-generated-key"
+  key_name   = var.key_name
   public_key = tls_private_key.my_key.public_key_openssh
 }
 
+# EC2 Instance
 resource "aws_instance" "flask_app" {
   ami                         = data.aws_ami.amazon_linux.id
   instance_type               = "t2.micro"
@@ -96,11 +103,13 @@ resource "aws_instance" "flask_app" {
     Name = "flask-e-commerce-app"
   }
 
+  # Write public IP into Ansible inventory
   provisioner "local-exec" {
     command = "echo '[web]\n${self.public_ip}' > ../ansible/inventory.ini"
   }
 }
 
+# Outputs
 output "private_key_pem" {
   value     = tls_private_key.my_key.private_key_pem
   sensitive = true
