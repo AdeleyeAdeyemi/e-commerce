@@ -50,28 +50,26 @@ pipeline {
         stage('Prepare Ansible Inventory') {
             steps {
                 script {
-                    
+                    // Get public IP from Terraform output
                     def publicIp = sh(
                         script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
                         returnStdout: true
                     ).trim()
-                
-                    // Use existing key
+
+                    // Use the existing PEM key
                     sh 'cp ~/terraform-key.pem private_key.pem'
                     sh 'chmod 600 private_key.pem'
-                
-                    // Write Ansible inventory
-                    def inventory = """
-                web:
-                  hosts:
-                    ${publicIp}:
-                      ansible_user: ec2-user
-                      ansible_ssh_private_key_file: private_key.pem
-                      ansible_python_interpreter: /usr/bin/python3
-                """
-                    writeFile file: 'inventory_generated.yml', text: inventory
-}
 
+                    // Generate Ansible inventory
+                    def inventory = """
+web:
+  hosts:
+    ${publicIp}:
+      ansible_user: ec2-user
+      ansible_ssh_private_key_file: private_key.pem
+      ansible_python_interpreter: /usr/bin/python3
+"""
+                    writeFile file: 'inventory_generated.yml', text: inventory
                 }
             }
         }
@@ -111,7 +109,6 @@ pipeline {
                 '''
             }
         }
-
     } // end stages
 
     post {
@@ -121,5 +118,6 @@ pipeline {
         }
     }
 }
+
 
 
