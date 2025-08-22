@@ -1,4 +1,4 @@
-pipeline {
+
     agent any
 
     environment {
@@ -58,9 +58,14 @@ pipeline {
                     sh 'chmod 600 private_key.pem'
                     
                     writeFile file: "inventory_generated.ini", text: """
-                    [web]
-                    ${publicIp} ansible_user=ec2-user ansible_ssh_private_key_file=private_key.pem ansible_python_interpreter=/usr/bin/python3
-                    """
+         all:
+          hosts:
+            ${publicIp}:
+              ansible_user: ec2-user
+              ansible_ssh_private_key_file: private_key.pem
+              ansible_python_interpreter: /usr/bin/python3
+                            [
+        """
 
 
                 }
@@ -69,7 +74,7 @@ pipeline {
 
         stage('Configure & Deploy with Ansible') {
             steps {
-                sh 'ansible-playbook -i inventory_generated.ini ansible/playbook.yml'
+                sh 'ansible-playbook -i inventory_generated.yml ansible/playbook.yml'
             }
         }
 
@@ -94,13 +99,12 @@ pipeline {
         stage('Run Selenium Tests') {
             steps {
                 sh '''
-                python3 -m venv --copies venv
-                    source venv/bin/activate
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                    pip install pytest selenium
-                    pytest tests/selenium
-                  
+                        python3 -m venv venv
+                    ./venv/bin/pip install --upgrade pip --break-system-packages
+                    ./venv/bin/pip install -r requirements.txt --break-system-packages
+                    ./venv/bin/pip install pytest selenium --break-system-packages
+                    ./venv/bin/pytest tests/selenium
+                      
                 '''
             }
         }
@@ -114,6 +118,7 @@ pipeline {
         }
     }
 }
+
 
 
 
