@@ -13,6 +13,36 @@ pipeline {
             }
         }
 
+        stage('Terraform Init') {
+            steps {
+                dir('terraform') {
+                    sh 'terraform init'
+                }
+            }
+        }
+
+        stage('Import SG if exists') {
+            steps {
+                dir('terraform') {
+                    sh '''
+                        # Try to import SG if it exists in AWS
+                        SG_ID=$(aws ec2 describe-security-groups \
+                            --filters "Name=group-name,Values=flask-app-sg" \
+                            --region ${TF_VAR_region} \
+                            --query "SecurityGroups[0].GroupId" \
+                            --output text 2>/dev/null || true)
+
+                        if [ "$SG_ID" != "None" ] && [ -n "$SG_ID" ]; then
+                            echo "Found existing SG: $SG_ID, importing into Terraform state..."
+                            terraform import aws_security_group.flask_sg $SG_ID || true
+                        else
+                            echo "No existing SG found, skipping import."
+                        fi
+                    '''
+                }
+            }
+        }
+
         stage('Provision Infrastructure') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'aws-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
@@ -21,7 +51,6 @@ pipeline {
                             export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                             export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
                             
-                            terraform init
                             terraform apply -auto-approve \
                                 -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
                                 -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
@@ -132,6 +161,8 @@ pipeline {
         }
     }
 }
+
+
 
 
 
