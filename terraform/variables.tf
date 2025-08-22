@@ -26,9 +26,4 @@ variable "private_key_path" {
   type        = string
 }
 
-variable "vpc_id" {
-  description = "VPC ID where the resources will be created"
-  type        = string
-}
-
 
