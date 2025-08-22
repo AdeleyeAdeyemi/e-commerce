@@ -49,10 +49,22 @@ pipeline {
 
         stage('Prepare Ansible Inventory') {
             steps {
-                sh 'ansible-playbook -i ansible/inventory.c ansible/playbook.yml'
-            }
-        }
+        script {
+            def publicIp = sh(script: "terraform output -raw public_ip", returnStdout: true).trim()
+            def privateKey = sh(script: "terraform output -raw private_key_pem", returnStdout: true).trim()
 
+            // Save private key
+            writeFile file: 'private_key.pem', text: privateKey
+            sh 'chmod 600 private_key.pem'
+
+            // Generate inventory
+            writeFile file: 'inventory_generated.ini', text: """
+[flask_app]
+${publicIp} ansible_user=ec2-user ansible_ssh_private_key_file=private_key.pem
+"""
+        }
+    }
+}
         stage('Configure & Deploy with Ansible') {
             steps {
                 sh 'ansible-playbook -i inventory/hosts deploy_app.yml'
@@ -91,4 +103,5 @@ pipeline {
         }
     }
 }
+
 
