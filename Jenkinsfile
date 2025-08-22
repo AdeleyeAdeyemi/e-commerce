@@ -67,7 +67,7 @@ ${publicIp} ansible_user=ec2-user ansible_ssh_private_key_file=private_key.pem
 }
         stage('Configure & Deploy with Ansible') {
             steps {
-                sh 'ansible-playbook -i inventory/hosts deploy_app.yml'
+                sh 'ansible-playbook -i inventory_generated.ini ansible/playbook.yml'
             }
         }
 
@@ -103,5 +103,6 @@ ${publicIp} ansible_user=ec2-user ansible_ssh_private_key_file=private_key.pem
         }
     }
 }
+
 
 
