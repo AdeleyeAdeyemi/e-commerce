@@ -53,14 +53,10 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    def privateKey = sh(
-                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_1p",
-                        returnStdout: true
-                    ).trim()
+    
+                    def pemFile = "${WORKSPACE}/com.pem"
 
-                    // Save private key
-                    writeFile file: 'terraform-key.pem', text: privateKey
-                    sh 'chmod 600 terraform-key.pem'
+                    sh "chmod 600 ${pemFile}"
 
                     // Create Ansible inventory
                     def inventory = """
@@ -68,7 +64,7 @@ all:
   hosts:
     ${publicIp}:
       ansible_user: ec2-user
-      ansible_ssh_private_key_file: ${pwd()}/terraform-key.pem
+      ansible_ssh_private_key_file: ${pemFile}
       ansible_python_interpreter: /usr/bin/python3
 """
                     writeFile file: 'inventory_generated.yml', text: inventory
@@ -120,5 +116,6 @@ all:
         }
     }
 }
+
 
 
