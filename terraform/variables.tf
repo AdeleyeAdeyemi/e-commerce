@@ -1,24 +1,26 @@
-variable "aws_access_key" {
-  description = "AWS access key"
+##############################
+# VARIABLES
+##############################
+variable "region" {
   type        = string
+  description = "AWS region"
+  default     = "eu-west-2"
+}
+
+variable "aws_access_key" {
+  type        = string
+  description = "AWS access key"
   sensitive   = true
 }
 
 variable "aws_secret_key" {
-  description = "AWS secret key"
   type        = string
+  description = "AWS secret key"
   sensitive   = true
 }
 
-variable "region" {
-  description = "AWS region"
-  type        = string
-  default     = "eu-west-2"
-}
-
 variable "key_name" {
-  description = "EC2 key pair name"
   type        = string
+  description = "EC2 Key Pair name"
 }
-
 
