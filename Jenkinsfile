@@ -32,17 +32,15 @@ pipeline {
                         sh """
                             export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                             export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-                        
+
                             terraform init
-                        
+
                             terraform plan -out=tfplan \\
                                 -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \\
                                 -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \\
                                 -var="key_name=terraform-generated-key"
-                        
-                            terraform apply -auto-approve tfplan
-                            
 
+                            terraform apply -auto-approve tfplan
                         """
                     }
                 }
@@ -52,26 +50,23 @@ pipeline {
         stage('Prepare Ansible Inventory') {
             steps {
                 script {
-                    stage('Prepare Ansible Inventory') {
-    steps {
-        script {
-            // Get Terraform outputs
-            def publicIp = sh(
-                script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip", 
-                returnStdout: true
-            ).trim()
-            
-            def privateKey = sh(
-                script: "terraform -chdir=${TERRAFORM_DIR} output -raw private_key_pem", 
-                returnStdout: true
-            ).trim()  // remove extra spaces/newlines
+                    // Get Terraform outputs
+                    def publicIp = sh(
+                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
+                        returnStdout: true
+                    ).trim()
 
-            // Save private key with correct permissions
-            writeFile file: 'private_key.pem', text: privateKey
-            sh 'chmod 600 private_key.pem'
+                    def privateKey = sh(
+                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw private_key_pem",
+                        returnStdout: true
+                    ).trim()
 
-            // Write Ansible inventory YAML
-            def inventory = """
+                    // Save private key with correct permissions
+                    writeFile file: 'private_key.pem', text: privateKey
+                    sh 'chmod 600 private_key.pem'
+
+                    // Write Ansible inventory YAML
+                    def inventory = """
 web:
   hosts:
     ${publicIp}:
@@ -79,12 +74,11 @@ web:
       ansible_ssh_private_key_file: private_key.pem
       ansible_python_interpreter: /usr/bin/python3
 """
-            writeFile file: 'inventory_generated.yml', text: inventory
+                    writeFile file: 'inventory_generated.yml', text: inventory
+                }
+            }
         }
-    }
-}
 
-        
         stage('Configure & Deploy with Ansible') {
             steps {
                 sh 'ansible-playbook -i inventory_generated.yml ansible/playbook.yml'
@@ -130,15 +124,3 @@ web:
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
