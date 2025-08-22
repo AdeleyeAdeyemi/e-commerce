@@ -29,19 +29,16 @@ pipeline {
                     )
                 ]) {
                     dir("${TERRAFORM_DIR}") {
-                        sh """
-                            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-
+                        sh '''
                             terraform init
 
-                            terraform plan -out=tfplan \\
-                                -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \\
-                                -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \\
+                            terraform plan -out=tfplan \
+                                -var="aws_access_key=$AWS_ACCESS_KEY_ID" \
+                                -var="aws_secret_key=$AWS_SECRET_ACCESS_KEY" \
                                 -var="key_name=terraform-generated-key"
 
                             terraform apply -auto-approve tfplan
-                        """
+                        '''
                     }
                 }
             }
@@ -55,17 +52,15 @@ pipeline {
                         returnStdout: true
                     ).trim()
                     
-                    // Get private key directly from Terraform output
+                    // Get private key directly from Terraform output, remove carriage returns
                     def privateKey = sh(
-                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw terraform_key_pem | tr -d'\\r",
+                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw terraform_key_pem | tr -d '\\r'",
                         returnStdout: true
                     ).trim()
 
-                    // Write private key to file with correct permissions
                     writeFile file: 'private_key.pem', text: privateKey
                     sh 'chmod 600 private_key.pem'
 
-                    // Write Ansible inventory
                     def inventory = """
 web:
   hosts:
@@ -114,7 +109,7 @@ web:
                 '''
             }
         }
-    } // end stages
+    }
 
     post {
         always {
@@ -123,7 +118,3 @@ web:
         }
     }
 }
-
-
-
-
