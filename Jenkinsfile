@@ -29,19 +29,19 @@ pipeline {
                     )
                 ]) {
                     dir("${TERRAFORM_DIR}") {
-                        sh '''
+                        sh """
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 
                             terraform init
 
-                            terraform plan -out=tfplan \
-                                -var="aws_access_key=$AWS_ACCESS_KEY_ID" \
-                                -var="aws_secret_key=$AWS_SECRET_ACCESS_KEY" \
+                            terraform plan -out=tfplan \\
+                                -var="aws_access_key=$AWS_ACCESS_KEY_ID" \\
+                                -var="aws_secret_key=$AWS_SECRET_ACCESS_KEY" \\
                                 -var="key_name=terraform-generated-key
-                                terraform apply -auto-approve tfplan
+                            terraform apply -auto-approve tfplan
 
-                        '''
+                        """
                     }
                 }
             }
@@ -115,6 +115,7 @@ web:
         }
     }
 }
+
 
 
 
