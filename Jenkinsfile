@@ -53,6 +53,8 @@ pipeline {
                             script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
                             returnStdout: true
                         ).trim()
+                        sh "chmod 600 ${PEM_FILE}"
+
 
                         // Create Ansible inventory
                         def inventory = """
@@ -113,6 +115,7 @@ all:
         }
     }
 }
+
 
 
 
