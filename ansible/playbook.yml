@@ -29,7 +29,8 @@
         dest: /home/ec2-user/e-commerce
 
     - name: Run Docker Compose
-      command: docker-compose up -d
+      command: docker compose up -d
       args:
         chdir: /home/ec2-user/e-commerce
+
 
