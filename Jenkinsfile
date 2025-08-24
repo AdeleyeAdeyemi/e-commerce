@@ -41,31 +41,32 @@ pipeline {
                 }
             }
         }
-
         stage('Prepare Ansible Inventory') {
             steps {
-                withCredentials([file(credentialsId: "${PEM_CREDENTIALS_ID}", variable: 'PEM_FILE')]) {
-                    script {
-                        sh "chmod 600 ${PEM_FILE}"
-
-                        // Get Terraform outputs
-                        def publicIp = sh(
-                            script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
-                            returnStdout: true
-                        ).trim()
-                        sh "chmod 600 ${PEM_FILE}"
-
-
-                        // Create Ansible inventory
-                        def inventory = """
+                script {
+                    // Get Terraform outputs
+                    def publicIp = sh(
+                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
+                        returnStdout: true
+                    ).trim()
+        
+                    // Use the Terraform-generated PEM file
+                    def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
+                    sh "chmod 600 ${pemFile}"
+        
+                    // Create Ansible inventory
+                    def inventory = """
 all:
   hosts:
     ${publicIp}:
       ansible_user: ec2-user
-      ansible_ssh_private_key_file: ${PEM_FILE}
+      ansible_ssh_private_key_file: ${pemFile}
       ansible_python_interpreter: /usr/bin/python3
 """
-                        writeFile file: 'inventory_generated.yml', text: inventory
+            writeFile file: 'inventory_generated.yml', text: inventory
+            echo "Ansible inventory created:\n${inventory}"
+
+        
                     }
                 }
             }
@@ -115,6 +116,7 @@ all:
         }
     }
 }
+
 
 
 
