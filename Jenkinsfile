@@ -31,13 +31,14 @@ pipeline {
                     dir("${TERRAFORM_DIR}") {
                         sh '''
                             terraform init
+                            terraform apply -auto-approve \
 
-                            terraform plan -out=tfplan \
+                           
                                 -var="aws_access_key=$AWS_ACCESS_KEY_ID" \
                                 -var="aws_secret_key=$AWS_SECRET_ACCESS_KEY" \
-                                -var="key_name=com-new"
+                                
 
-                            terraform apply -auto-approve tfplan
+                           
                         '''
                     }
                 }
@@ -54,9 +55,9 @@ pipeline {
                     ).trim()
 
     
-                    def pemFile = "${WORKSPACE}/com-new.pem"
+                    
 
-                    sh "chmod 600 ${pemFile}"
+                    sh "chmod 600 ${pemPath}"
 
                     // Create Ansible inventory
                     def inventory = """
@@ -64,7 +65,7 @@ all:
   hosts:
     ${publicIp}:
       ansible_user: ec2-user
-      ansible_ssh_private_key_file: ${pemFile}
+      ansible_ssh_private_key_file: ${pemPath}
       ansible_python_interpreter: /usr/bin/python3
 """
                     writeFile file: 'inventory_generated.yml', text: inventory
@@ -116,6 +117,7 @@ all:
         }
     }
 }
+
 
 
 
