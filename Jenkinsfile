@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         TERRAFORM_DIR = "terraform"
-        PEM_CREDENTIALS_ID = "aws-pem-key"   /* Jenkins credential ID for PEM file */
+        PEM_CREDENTIALS_ID = "aws-pem-key"   // Jenkins credential ID for PEM file
         AWS_CREDENTIALS_ID = "aws-credentials"
         BRANCH_NAME = "main"
         REGION = "us-west-2"
@@ -41,6 +41,7 @@ pipeline {
                 }
             }
         }
+
         stage('Prepare Ansible Inventory') {
             steps {
                 script {
@@ -63,11 +64,8 @@ all:
       ansible_ssh_private_key_file: ${pemFile}
       ansible_python_interpreter: /usr/bin/python3
 """
-            writeFile file: 'inventory_generated.yml', text: inventory
-            echo "Ansible inventory created:\n${inventory}"
-
-        
-                    }
+                    writeFile file: 'inventory_generated.yml', text: inventory
+                    echo "Ansible inventory created:\n${inventory}"
                 }
             }
         }
@@ -116,8 +114,6 @@ all:
         }
     }
 }
-
-
 
 
 
