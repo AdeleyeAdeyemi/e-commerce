@@ -3,10 +3,10 @@ pipeline {
 
     environment {
         TERRAFORM_DIR = "terraform"
-        PEM_CREDENTIALS_ID = 'aws-pem-key'   // Jenkins credential ID for PEM file
-        AWS_CREDENTIALS_ID = 'aws-credentials'
-        BRANCH_NAME = 'main'
-        REGION = 'us-WEST-2'
+        PEM_CREDENTIALS_ID = "aws-pem-key"   /* Jenkins credential ID for PEM file */
+        AWS_CREDENTIALS_ID = "aws-credentials"
+        BRANCH_NAME = "main"
+        REGION = "us-west-2"
     }
 
     stages {
@@ -14,10 +14,10 @@ pipeline {
         stage('Checkout SCM') {
             steps {
                 checkout([$class: 'GitSCM',
-                    branches: [[name: '*/main']],
+                    branches: [[name: "*/${BRANCH_NAME}"]],
                     userRemoteConfigs: [[
                         url: 'https://github.com/AdeleyeAdeyemi/e-commerce',
-                        credentialsId: 'aws-credentials'
+                        credentialsId: "${AWS_CREDENTIALS_ID}"
                     ]]
                 ])
             }
@@ -27,7 +27,7 @@ pipeline {
             steps {
                 withCredentials([
                     usernamePassword(
-                        credentialsId: 'aws-credentials',
+                        credentialsId: "${AWS_CREDENTIALS_ID}",
                         usernameVariable: 'AWS_ACCESS_KEY_ID',
                         passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                     )
@@ -35,8 +35,7 @@ pipeline {
                     dir("${TERRAFORM_DIR}") {
                         sh '''
                             terraform init
-                            terraform apply -auto-approve 
-                           
+                            terraform apply -auto-approve
                         '''
                     }
                 }
@@ -44,23 +43,19 @@ pipeline {
         }
 
         stage('Prepare Ansible Inventory') {
-            steps { 
+            steps {
                 withCredentials([file(credentialsId: "${PEM_CREDENTIALS_ID}", variable: 'PEM_FILE')]) {
-                    
-                     script {
-                            // Get Terraform outputs
-                            def publicIp = sh(
-                                script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
-                                returnStdout: true
-                            ).trim()
+                    script {
+                        // Get Terraform outputs
+                        def publicIp = sh(
+                            script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
+                            returnStdout: true
+                        ).trim()
 
-    
-                    
+                        sh "chmod 600 ${PEM_FILE}"
 
-                            sh "chmod 600 ${PEM_FILE}"
-        
-                            // Create Ansible inventory
-                            def inventory = """
+                        // Create Ansible inventory
+                        def inventory = """
 all:
   hosts:
     ${publicIp}:
@@ -68,7 +63,8 @@ all:
       ansible_ssh_private_key_file: ${PEM_FILE}
       ansible_python_interpreter: /usr/bin/python3
 """
-                    writeFile file: 'inventory_generated.yml', text: inventory
+                        writeFile file: 'inventory_generated.yml', text: inventory
+                    }
                 }
             }
         }
@@ -117,8 +113,6 @@ all:
         }
     }
 }
-
-
 
 
 
