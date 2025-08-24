@@ -61,7 +61,7 @@ all:
   hosts:
     ${publicIp}:
       ansible_user: ec2-user
-      ansible_ssh_private_key_file:terraform/jenkins-key.pem
+      ansible_ssh_private_key_file: terraform/jenkins-key.pem
       ansible_python_interpreter: /usr/bin/python3
       ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null' 
       
@@ -116,6 +116,7 @@ all:
         }
     }
 }
+
 
 
 
