@@ -44,21 +44,23 @@ pipeline {
         }
 
         stage('Prepare Ansible Inventory') {
-            steps {
-                script {
-                    // Get Terraform outputs
-                    def publicIp = sh(
-                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
-                        returnStdout: true
-                    ).trim()
+            steps { 
+                withCredentials([file(credentialsId: "${PEM_CREDENTIALS_ID}", variable: 'PEM_FILE')]) {
+                    
+                     script {
+                            // Get Terraform outputs
+                            def publicIp = sh(
+                                script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
+                                returnStdout: true
+                            ).trim()
 
     
                     
 
-                    sh "chmod 600 ${PEM_FILE}"
-
-                    // Create Ansible inventory
-                    def inventory = """
+                            sh "chmod 600 ${PEM_FILE}"
+        
+                            // Create Ansible inventory
+                            def inventory = """
 all:
   hosts:
     ${publicIp}:
@@ -115,6 +117,7 @@ all:
         }
     }
 }
+
 
 
 
