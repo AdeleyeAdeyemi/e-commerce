@@ -1,5 +1,7 @@
 provider "aws" {
-  region = "us-west-2"
+  region = var.region
+  access_key = env.AWS_ACCESS_KEY_ID
+  secret_key = env.AWS_SECRET_ACCESS_KEY
 }
 
 # Generate new key pair each run
@@ -99,5 +101,6 @@ resource "aws_instance" "ec2" {
     Name = "jenkins_ec2"
   }
 }
+
 
 
