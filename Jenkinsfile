@@ -99,8 +99,9 @@ all:
         stage('Run Selenium Tests') {
             steps {
                 sh '''
-                    python3 -m venv --copies venv 
-                    ./venv/bin/python3 -m pip install --upgrade pip 
+                    python3 -m pip install --upgrade pip setuptools wheel
+                    python3 -m venv --copies--upgrade-deps venv 
+                    ./venv/bin/python3 -m pip install --upgrade "pip<24" 
                     ./venv/bin/python3 -m pip install -r requirements.txt 
                     ./venv/bin/python3 -m pip install pytest selenium 
                     ./venv/bin/python3 -m pytest tests/selenium
@@ -117,6 +118,7 @@ all:
         }
     }
 }
+
 
 
 
