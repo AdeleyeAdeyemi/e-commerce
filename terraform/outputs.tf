@@ -1,14 +1,7 @@
-##############################
-# OUTPUTS
-##############################
 output "public_ip" {
-  description = "Public IP of the Flask app"
-  value       = aws_instance.flask_app.public_ip
+  value = aws_instance.ec2.public_ip
 }
 
-output "security_group_id" {
-  description = "ID of the Flask app security group"
-  value       = aws_security_group.flask_sg.id
+output "private_key_path" {
+  value = local_file.private_key.filename
 }
-
-
