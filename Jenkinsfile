@@ -100,10 +100,11 @@ all:
             steps {
                 sh '''
                     python3 -m venv venv --copies
-                    ./venv/bin/pip install --upgrade pip --break-system-packages
-                    ./venv/bin/pip install -r requirements.txt --break-system-packages
-                    ./venv/bin/pip install pytest selenium --break-system-packages
-                    ./venv/bin/pytest tests/selenium
+                    ./venv/bin/python3 -m pip install --upgrade pip --break-system-packages
+                    ./venv/bin/python3 -m pip install -r requirements.txt --break-system-packages
+                    ./venv/bin/python3 -m pip install pytest selenium --break-system-packages
+                    ./venv/bin/python3 -m pytest tests/selenium
+                    
                 '''
             }
         }
@@ -116,6 +117,7 @@ all:
         }
     }
 }
+
 
 
 
