@@ -3,6 +3,10 @@ pipeline {
 
     environment {
         TERRAFORM_DIR = "terraform"
+        PEM_CREDENTIALS_ID = 'aws-pem-key'   // Jenkins credential ID for PEM file
+        AWS_CREDENTIALS_ID = 'aws-credentials'
+        BRANCH_NAME = 'main'
+        REGION = 'us-WEST-2'
     }
 
     stages {
@@ -51,7 +55,7 @@ pipeline {
     
                     
 
-                    sh "chmod 600 ${pemPath}"
+                    sh "chmod 600 ${PEM_FILE}"
 
                     // Create Ansible inventory
                     def inventory = """
@@ -59,7 +63,7 @@ all:
   hosts:
     ${publicIp}:
       ansible_user: ec2-user
-      ansible_ssh_private_key_file: ${pemPath}
+      ansible_ssh_private_key_file: ${PEM_FILE}
       ansible_python_interpreter: /usr/bin/python3
 """
                     writeFile file: 'inventory_generated.yml', text: inventory
@@ -111,6 +115,7 @@ all:
         }
     }
 }
+
 
 
 
