@@ -46,13 +46,13 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: "${PEM_CREDENTIALS_ID}", variable: 'PEM_FILE')]) {
                     script {
+                        sh "chmod 600 ${PEM_FILE}"
+
                         // Get Terraform outputs
                         def publicIp = sh(
                             script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
                             returnStdout: true
                         ).trim()
-
-                        sh "chmod 600 ${PEM_FILE}"
 
                         // Create Ansible inventory
                         def inventory = """
@@ -113,6 +113,7 @@ all:
         }
     }
 }
+
 
 
 
