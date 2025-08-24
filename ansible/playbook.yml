@@ -1,5 +1,5 @@
 - name: Setup and Deploy Flask App
-  hosts: web
+  hosts: all
   become: yes
 
   tasks:
@@ -32,3 +32,4 @@
       command: docker-compose up -d
       args:
         chdir: /home/ec2-user/e-commerce
+
