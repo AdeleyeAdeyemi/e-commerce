@@ -101,6 +101,8 @@ all:
                 sh '''
                     if [ ! -d "venv" ]; then
                         python3 -m venv --copies --upgrade-deps venv
+                        chmod +x venv/bin/python3
+                        
                     fi
 
                     ./venv/bin/python3 -m pip install --upgrade "pip<24" setuptools wheel
@@ -119,6 +121,7 @@ all:
         }
     }
 }
+
 
 
 
