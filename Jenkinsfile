@@ -103,7 +103,6 @@ all:
                         python3 -m venv --copies --upgrade-deps venv
                     fi
 
-                    python3 -m venv --copies --upgrade-deps venv 
                     ./venv/bin/python3 -m pip install --upgrade "pip<24" setuptools wheel
                     ./venv/bin/python3 -m pip install -r requirements.txt pytest selenium 
                     ./venv/bin/python3 -m pytest tests/selenium --maxfail=1 --disable-warnings -q
@@ -120,6 +119,7 @@ all:
         }
     }
 }
+
 
 
 
