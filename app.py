@@ -73,10 +73,11 @@ def clear_cart():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8777, debug=False)
+    app.run(host='0.0.0.0', port=8777, debug=True)
 
 
   
+
 
 
 
