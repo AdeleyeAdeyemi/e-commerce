@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         TERRAFORM_DIR = "terraform"
-        PEM_CREDENTIALS_ID = "aws-pem-key"   // Jenkins credential ID for PEM file
+        PEM_CREDENTIALS_ID = "aws-pem-key"   /* Jenkins credential ID for PEM file */
         AWS_CREDENTIALS_ID = "aws-credentials"
         BRANCH_NAME = "main"
         REGION = "us-west-2"
@@ -46,14 +46,10 @@ pipeline {
         stage('Prepare Ansible Inventory') {
             steps {
                 script {
-                    def publicIp = sh(
-                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
-                        returnStdout: true
-                    ).trim()
-                    
+                    def publicIp = sh(script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
                     def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
                     sh "chmod 600 ${pemFile}"
-                    
+
                     def inventory = """
 all:
   hosts:
@@ -78,23 +74,28 @@ all:
         stage('Build & Run Docker') {
             steps {
                 sh 'docker compose up -d --remove-orphans'
+               
+            }
+        } 
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    def buildResult = sh(script: 'docker build -t ecommerce-app:latest .', returnStatus: true)
+                    if (buildResult != 0) {
+                        sh 'docker logs $(docker ps -q --filter "name=ecommerce-app") || true'
+                        error "Docker build failed"
+                    }
+                }
             }
         }
 
         stage('Verify Image') {
             steps {
-                script {
-                    def publicIp = sh(
-                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
-                        returnStdout: true
-                    ).trim()
-                    def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
-                    
-                    sh """
-                        ssh -o StrictHostKeyChecking=no -i ${pemFile} ec2-user@${publicIp} \\
-                        'docker run --rm ecommerce-app:latest python3 --version && docker run --rm ecommerce-app:latest pip list'
-                    """
-                }
+                sh '''
+                    docker run --rm ecommerce-app:latest python3 --version
+                    docker run --rm ecommerce-app:latest pip list
+                '''
             }
         }
 
@@ -153,6 +154,7 @@ all:
         }
     }
 }
+
 
 
 
