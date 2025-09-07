@@ -7,6 +7,7 @@ pipeline {
         AWS_CREDENTIALS_ID = "aws-credentials"
         BRANCH_NAME = "main"
         REGION = "us-west-2"
+        IMAGE_TAG = "latest"
     }
 
     stages {
@@ -45,26 +46,22 @@ pipeline {
         stage('Prepare Ansible Inventory') {
             steps {
                 script {
-                    // Get Terraform outputs
                     def publicIp = sh(
                         script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
                         returnStdout: true
                     ).trim()
-        
-                    // Use the Terraform-generated PEM file
+                    
                     def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
                     sh "chmod 600 ${pemFile}"
-        
-                    // Create Ansible inventory
+                    
                     def inventory = """
 all:
   hosts:
     ${publicIp}:
       ansible_user: ec2-user
-      ansible_ssh_private_key_file: terraform/jenkins-key.pem
+      ansible_ssh_private_key_file: ${pemFile}
       ansible_python_interpreter: /usr/bin/python3
-      ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null' 
-      
+      ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
 """
                     writeFile file: 'inventory_generated.yml', text: inventory
                     echo "Ansible inventory created:\n${inventory}"
@@ -81,6 +78,36 @@ all:
         stage('Build & Run Docker') {
             steps {
                 sh 'docker compose up -d --remove-orphans'
+            }
+        }
+
+        stage('Verify Image') {
+            steps {
+                sh '''
+                    docker run --rm world_of_games2:latest python3 --version
+                    docker run --rm world_of_games2:latest pip list
+                '''
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials', 
+                    usernameVariable: 'DOCKER_USER', 
+                    passwordVariable: 'DOCKER_PASS')]) {
+                    sh """
+                        echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+                        docker tag world_of_games2:latest \$DOCKER_USER/world_of_games2:${IMAGE_TAG}
+                        docker push \$DOCKER_USER/world_of_games2:${IMAGE_TAG}
+                    """
+                }
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps {
+                archiveArtifacts artifacts: '**/*.py', fingerprint: true
             }
         }
 
@@ -101,14 +128,11 @@ all:
                 sh '''
                     if [ ! -d "venv" ]; then
                         python3 -m venv --copies --upgrade-deps venv
-                        
-                        
                     fi
                     chmod +x venv/bin/python3
                     ./venv/bin/python3 -m pip install --upgrade "pip<24" setuptools wheel
-                    ./venv/bin/python3 -m pip install -r requirements.txt pytest selenium 
+                    ./venv/bin/python3 -m pip install -r requirements.txt pytest selenium
                     ./venv/bin/python3 -m pytest tests/selenium --maxfail=1 --disable-warnings -q
-                    
                 '''
             }
         }
@@ -121,12 +145,6 @@ all:
         }
     }
 }
-
-
-
-
-
-
 
 
 
