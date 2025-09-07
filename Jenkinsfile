@@ -6,7 +6,7 @@ pipeline {
         PEM_CREDENTIALS_ID = "aws-pem-key"   // Jenkins credential ID for PEM file
         AWS_CREDENTIALS_ID = "aws-credentials"
         BRANCH_NAME = "main"
-        REGION = "us-east-1"
+        REGION = "us-west-2"
     }
 
     stages {
@@ -121,6 +121,7 @@ all:
         }
     }
 }
+
 
 
 
