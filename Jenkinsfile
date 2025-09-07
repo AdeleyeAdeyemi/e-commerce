@@ -84,8 +84,8 @@ all:
         stage('Verify Image') {
             steps {
                 sh '''
-                    docker run --rm world_of_games2:latest python3 --version
-                    docker run --rm world_of_games2:latest pip list
+                    docker run --rm  ecommerce-app:latest python3 --version
+                    docker run --rm  ecommerce-app:latest pip list
                 '''
             }
         }
@@ -98,8 +98,8 @@ all:
                     passwordVariable: 'DOCKER_PASS')]) {
                     sh """
                         echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
-                        docker tag world_of_games2:latest \$DOCKER_USER/world_of_games2:${IMAGE_TAG}
-                        docker push \$DOCKER_USER/world_of_games2:${IMAGE_TAG}
+                        docker tag  ecommerce-app:latest \$DOCKER_USER/ ecommerce-app:${IMAGE_TAG}
+                        docker push \$DOCKER_USER/ ecommerce-app:${IMAGE_TAG}
                     """
                 }
             }
@@ -145,6 +145,7 @@ all:
         }
     }
 }
+
 
 
 
