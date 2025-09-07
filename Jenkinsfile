@@ -83,10 +83,18 @@ all:
 
         stage('Verify Image') {
             steps {
-                sh '''
-                    docker run --rm  ecommerce-app:latest python3 --version
-                    docker run --rm  ecommerce-app:latest pip list
-                '''
+                script {
+                    def publicIp = sh(
+                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
+                        returnStdout: true
+                    ).trim()
+                    def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
+                    
+                    sh """
+                        ssh -o StrictHostKeyChecking=no -i ${pemFile} ec2-user@${publicIp} \\
+                        'docker run --rm ecommerce-app:latest python3 --version && docker run --rm ecommerce-app:latest pip list'
+                    """
+                }
             }
         }
 
@@ -98,8 +106,8 @@ all:
                     passwordVariable: 'DOCKER_PASS')]) {
                     sh """
                         echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
-                        docker tag  ecommerce-app:latest \$DOCKER_USER/ ecommerce-app:${IMAGE_TAG}
-                        docker push \$DOCKER_USER/ ecommerce-app:${IMAGE_TAG}
+                        docker tag ecommerce-app:latest \$DOCKER_USER/ecommerce-app:${IMAGE_TAG}
+                        docker push \$DOCKER_USER/ecommerce-app:${IMAGE_TAG}
                     """
                 }
             }
@@ -145,13 +153,6 @@ all:
         }
     }
 }
-
-
-
-
-
-
-
 
 
 
