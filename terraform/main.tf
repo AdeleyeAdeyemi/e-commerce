@@ -22,8 +22,9 @@ resource "local_file" "private_key" {
 
 # Security group
 resource "aws_security_group" "ec2_sg" {
-  name        = "ec2-sg"
+  name_prefix = "ec2-sg"
   description = "Allow SSH and HTTP"
+  vpc_id      = aws_vpc.main.id
 
 
   ingress {
@@ -107,6 +108,7 @@ resource "aws_instance" "ec2" {
     Name = "jenkins_ec2"
   }
 }
+
 
 
 
