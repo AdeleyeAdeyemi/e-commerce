@@ -99,7 +99,7 @@ all:
         }
         stage('Setup Kubeconfig') {
     steps {
-        sh '''
+        sh """
           # Copy kubeconfig and certs to workspace
             mkdir -p $WORKSPACE/.kube
             cp /var/lib/jenkins/.kube/config $WORKSPACE/.kube/config
@@ -116,7 +116,7 @@ all:
 
             # Test kubectl access
             KUBECONFIG=$WORKSPACE/.kube/config kubectl get nodes
-        '''
+        """
            
     }
 }
@@ -192,6 +192,7 @@ all:
         }
     }
 }
+
 
 
 
