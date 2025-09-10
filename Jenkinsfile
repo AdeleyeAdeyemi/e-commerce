@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         TERRAFORM_DIR       = "terraform"
-        PEM_CREDENTIALS_ID  = "aws-pem-key"   /* Jenkins credential ID for PEM file */
+        PEM_CREDENTIALS_ID  = "aws-pem-key"   // Jenkins credential ID for PEM file
         AWS_CREDENTIALS_ID  = "aws-credentials"
         BRANCH_NAME         = "main"
         REGION              = "us-west-2"
@@ -102,6 +102,9 @@ all:
             steps {
                 withKubeConfig([credentialsId: 'kubeconfig-credentials']) {
                     sh '''
+                        # KUBECONFIG is set automatically by withKubeConfig
+                        kubectl get nodes
+                        kubectl get pods --all-namespaces
                         kubectl apply -f K8S/deployment.yaml
                         kubectl rollout status deployment/ecommerce-app
                     '''
@@ -114,7 +117,8 @@ all:
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-credentials', 
                     usernameVariable: 'DOCKER_USER', 
-                    passwordVariable: 'DOCKER_PASS')]) {
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
                     sh """
                         echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
                         docker tag ecommerce-app:latest \$DOCKER_USER/ecommerce-app:${IMAGE_TAG}
@@ -164,6 +168,7 @@ all:
         }
     }
 }
+
 
 
 
