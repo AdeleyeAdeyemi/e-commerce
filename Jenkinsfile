@@ -110,9 +110,9 @@ all:
             chmod 600 $WORKSPACE/.kube/config $WORKSPACE/.kube/*.crt $WORKSPACE/.kube/*.key
 
             # Update kubeconfig paths
-            sed -i 's|/home/onisowo/jenkins_home/.minikube/ca.crt|$WORKSPACE/.kube/ca.crt|g' $WORKSPACE/.kube/config
-            sed -i 's|/home/onisowo/jenkins_home/.minikube/profiles/minikube/client.crt|$WORKSPACE/.kube/client.crt|g' $WORKSPACE/.kube/config
-            sed -i 's|/home/onisowo/jenkins_home/.minikube/profiles/minikube/client.key|$WORKSPACE/.kube/client.key|g' $WORKSPACE/.kube/config
+            sed -i "s|/home/onisowo/jenkins_home/.minikube/ca.crt|$WORKSPACE/.kube/ca.crt|g" $WORKSPACE/.kube/config
+            sed -i "s|/home/onisowo/jenkins_home/.minikube/profiles/minikube/client.crt|$WORKSPACE/.kube/client.crt|g" $WORKSPACE/.kube/config
+            sed -i "s|/home/onisowo/jenkins_home/.minikube/profiles/minikube/client.key|$WORKSPACE/.kube/client.key|g" $WORKSPACE/.kube/config
 
             # Test kubectl access
             KUBECONFIG=$WORKSPACE/.kube/config kubectl get nodes
@@ -192,6 +192,7 @@ all:
         }
     }
 }
+
 
 
 
