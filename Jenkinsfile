@@ -100,23 +100,24 @@ all:
         stage('Setup Kubeconfig') {
     steps {
         sh '''
-            # Create Jenkins kube directory if it doesn't exist
+          # Copy kubeconfig and certs to workspace
             mkdir -p $WORKSPACE/.kube
+            cp /var/lib/jenkins/.kube/config $WORKSPACE/.kube/config
+            cp /var/lib/jenkins/.kube/*.crt $WORKSPACE/.kube/
+            cp /var/lib/jenkins/.kube/*.key $WORKSPACE/.kube/
 
-            # Copy your kubeconfig (replace with your actual path if needed)
-            cp /home/onisowo/jenkins_home/.kube/config $WORKSPACE/.kube/config
+            # Fix permissions
+            chmod 600 $WORKSPACE/.kube/config $WORKSPACE/.kube/*.crt $WORKSPACE/.kube/*.key
 
-            # Ensure permissions
-            chmod 600 $WORKSPACE/.kube/config
+            # Update kubeconfig paths
+            sed -i 's|/home/onisowo/jenkins_home/.minikube/ca.crt|$WORKSPACE/.kube/ca.crt|g' $WORKSPACE/.kube/config
+            sed -i 's|/home/onisowo/jenkins_home/.minikube/profiles/minikube/client.crt|$WORKSPACE/.kube/client.crt|g' $WORKSPACE/.kube/config
+            sed -i 's|/home/onisowo/jenkins_home/.minikube/profiles/minikube/client.key|$WORKSPACE/.kube/client.key|g' $WORKSPACE/.kube/config
 
-            # Fix the certificate paths inside kubeconfig
-            sed -i 's|/home/onisowo/.minikube/ca.crt|/home/onisowo/jenkins_home/.minikube/ca.crt|g' $WORKSPACE/.kube/config
-            sed -i 's|/home/onisowo/.minikube/profiles/minikube/client.crt|/home/onisowo/jenkins_home/.minikube/client.crt|g' $WORKSPACE/.kube/config
-            sed -i 's|/home/onisowo/.minikube/profiles/minikube/client.key|/home/onisowo/jenkins_home/.minikube/client.key|g' $WORKSPACE/.kube/config
-
-            # Optional: test that kubectl works
+            # Test kubectl access
             KUBECONFIG=$WORKSPACE/.kube/config kubectl get nodes
         '''
+           
     }
 }
 
@@ -191,6 +192,7 @@ all:
         }
     }
 }
+
 
 
 
