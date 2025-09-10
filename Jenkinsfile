@@ -123,11 +123,11 @@ all:
             steps {
                 withKubeConfig([credentialsId: 'kubeconfig-credentials']) {
                     sh '''
-                        # KUBECONFIG is set automatically by withKubeConfig
-                        kubectl get nodes
-                        kubectl get pods --all-namespaces
-                        kubectl apply -f K8S/deployment.yaml
-                        kubectl rollout status deployment/ecommerce-app
+                       kubectl apply -f k8s/
+                       kubectl get all -n devops-tools
+                       kubectl get pvc -n devops-tools
+                       kubectl describe deployment jenkins -n devops-tools
+
                     '''
                 }
             }
@@ -189,6 +189,7 @@ all:
         }
     }
 }
+
 
 
 
