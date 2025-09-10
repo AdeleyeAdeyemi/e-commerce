@@ -97,6 +97,29 @@ all:
                 '''
             }
         }
+        stage('Setup Kubeconfig') {
+    steps {
+        sh '''
+            # Create Jenkins kube directory if it doesn't exist
+            mkdir -p $WORKSPACE/.kube
+
+            # Copy your kubeconfig (replace with your actual path if needed)
+            cp /home/onisowo/jenkins_home/.kube/config $WORKSPACE/.kube/config
+
+            # Ensure permissions
+            chmod 600 $WORKSPACE/.kube/config
+
+            # Fix the certificate paths inside kubeconfig
+            sed -i 's|/home/onisowo/.minikube/ca.crt|/home/onisowo/jenkins_home/.minikube/ca.crt|g' $WORKSPACE/.kube/config
+            sed -i 's|/home/onisowo/.minikube/profiles/minikube/client.crt|/home/onisowo/jenkins_home/.minikube/client.crt|g' $WORKSPACE/.kube/config
+            sed -i 's|/home/onisowo/.minikube/profiles/minikube/client.key|/home/onisowo/jenkins_home/.minikube/client.key|g' $WORKSPACE/.kube/config
+
+            # Optional: test that kubectl works
+            KUBECONFIG=$WORKSPACE/.kube/config kubectl get nodes
+        '''
+    }
+}
+
 
         stage('Deploy to Kubernetes') {
             steps {
@@ -168,6 +191,7 @@ all:
         }
     }
 }
+
 
 
 
