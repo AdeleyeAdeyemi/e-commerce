@@ -68,3 +68,4 @@ This repository contains a **Flask-based e-commerce application** and a complete
 ```bash
 git clone https://github.com/AdeleyeAdeyemi/e-commerce.git
 cd e-commerce
+# e-commerce2
