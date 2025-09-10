@@ -99,7 +99,7 @@ data "aws_ami" "amazon_linux" {
 resource "aws_instance" "ec2" {
   ami                         = data.aws_ami.amazon_linux.id
   instance_type               = "t3.micro"
-  key_name                    = aws_key_pair.generated.key_name
+  key_name                    = aws_key_pair.jenkins.key_name
   vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
   associate_public_ip_address = true
 
@@ -107,6 +107,7 @@ resource "aws_instance" "ec2" {
     Name = "jenkins_ec2"
   }
 }
+
 
 
 
