@@ -102,18 +102,15 @@ all:
         sh """
           # Copy kubeconfig and certs to workspace
             mkdir -p $WORKSPACE/.kube
-            cp /var/lib/jenkins/.kube/config $WORKSPACE/.kube/config
-            cp /var/lib/jenkins/.kube/*.crt $WORKSPACE/.kube/
-            cp /var/lib/jenkins/.kube/*.key $WORKSPACE/.kube/
+            cp /var/lib/jenkins/.kube/* $WORKSPACE/.kube/
 
             # Fix permissions
-            chmod 600 $WORKSPACE/.kube/config $WORKSPACE/.kube/*.crt $WORKSPACE/.kube/*.key
+              chmod 600 $WORKSPACE/.kube/*
 
             # Update kubeconfig paths
-            sed -i "s|/home/onisowo/jenkins_home/.minikube/ca.crt|$WORKSPACE/.kube/ca.crt|g" $WORKSPACE/.kube/config
-            sed -i "s|/home/onisowo/jenkins_home/.minikube/profiles/minikube/client.crt|$WORKSPACE/.kube/client.crt|g" $WORKSPACE/.kube/config
-            sed -i "s|/home/onisowo/jenkins_home/.minikube/profiles/minikube/client.key|$WORKSPACE/.kube/client.key|g" $WORKSPACE/.kube/config
-
+            sed -i "s|/home/onisowo/.minikube/ca.crt|$WORKSPACE/.kube/ca.crt|g" $WORKSPACE/.kube/config
+            sed -i "s|/home/onisowo/.minikube/profiles/minikube/client.crt|$WORKSPACE/.kube/client.crt|g" $WORKSPACE/.kube/config
+            sed -i "s|/home/onisowo/.minikube/profiles/minikube/client.key|$WORKSPACE/.kube/client.key|g" $WORKSPACE/.kube/config
             # Test kubectl access
             KUBECONFIG=$WORKSPACE/.kube/config kubectl get nodes
         """
@@ -192,6 +189,7 @@ all:
         }
     }
 }
+
 
 
 
