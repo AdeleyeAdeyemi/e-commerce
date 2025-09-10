@@ -123,6 +123,9 @@ all:
             steps {
                 withKubeConfig([credentialsId: 'kubeconfig-credentials']) {
                     sh '''
+                       unzip -o jenkins-kube.zip -d $WORKSPACE/.kube/
+                       export KUBECONFIG=$WORKSPACE/.kube/config
+                       kubectl get nodes
                        kubectl apply -f k8s/
                        kubectl get all -n devops-tools
                        kubectl get pvc -n devops-tools
@@ -189,6 +192,7 @@ all:
         }
     }
 }
+
 
 
 
