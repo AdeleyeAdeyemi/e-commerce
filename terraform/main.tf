@@ -33,6 +33,13 @@ resource "aws_security_group" "ec2_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   ingress {
     from_port   = 8777
     to_port     = 8777
@@ -100,6 +107,7 @@ resource "aws_instance" "ec2" {
     Name = "jenkins_ec2"
   }
 }
+
 
 
 
