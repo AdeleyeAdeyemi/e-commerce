@@ -100,7 +100,7 @@ all:
 
         stage('Deploy to Kubernetes') {
             steps {
-                withKubeConfig([kubeConfigFile: '/var/lib/jenkins/kube/config']) {
+                withKubeConfig([credentialsId: 'kubeconfig-credentials']) {
                     sh '''
                         # KUBECONFIG is set automatically by withKubeConfig
                         kubectl get nodes
@@ -168,6 +168,7 @@ all:
         }
     }
 }
+
 
 
 
