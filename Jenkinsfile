@@ -2,12 +2,12 @@ pipeline {
     agent any
 
     environment {
-        TERRAFORM_DIR = "terraform"
-        PEM_CREDENTIALS_ID = "aws-pem-key"   /* Jenkins credential ID for PEM file */
-        AWS_CREDENTIALS_ID = "aws-credentials"
-        BRANCH_NAME = "main"
-        REGION = "us-west-2"
-        IMAGE_TAG = "latest"
+        TERRAFORM_DIR       = "terraform"
+        PEM_CREDENTIALS_ID  = "aws-pem-key"   /* Jenkins credential ID for PEM file */
+        AWS_CREDENTIALS_ID  = "aws-credentials"
+        BRANCH_NAME         = "main"
+        REGION              = "us-west-2"
+        IMAGE_TAG           = "latest"
     }
 
     stages {
@@ -60,7 +60,7 @@ all:
       ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
 """
                     writeFile file: 'inventory_generated.yml', text: inventory
-                    echo "Ansible inventory created:\n${inventory}"
+                    echo "Ansible inventory created:\\n${inventory}"
                 }
             }
         }
@@ -74,7 +74,6 @@ all:
         stage('Build & Run Docker') {
             steps {
                 sh 'docker compose up -d --remove-orphans'
-               
             }
         } 
 
@@ -96,6 +95,17 @@ all:
                     docker run --rm ecommerce-app:latest python3 --version
                     docker run --rm ecommerce-app:latest pip list
                 '''
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                withKubeConfig([credentialsId: 'kubeconfig-credentials']) {
+                    sh '''
+                        kubectl apply -f K8S/deployment.yaml
+                        kubectl rollout status deployment/ecommerce-app
+                    '''
+                }
             }
         }
 
@@ -154,9 +164,6 @@ all:
         }
     }
 }
-
-
-
 
 
 
