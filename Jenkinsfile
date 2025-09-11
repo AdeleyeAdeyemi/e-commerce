@@ -107,9 +107,16 @@ all:
 
                     sh """
                         ssh -o StrictHostKeyChecking=no -i ${pemFile} ec2-user@${publicIp} '
+                            export PATH=~/bin:\$PATH
                             export KUBECONFIG=~/.kube/config
-                            kubectl get nodes
-                        '
+                            echo "Kubectl version:"
+                            kubectl version --client
+                            echo "Deploying K8S manifests..."
+                            kubectl apply -f ~/app/K8S/
+                            kubectl get all -n devops-tools
+                            kubectl get pvc -n devops-tools
+                            kubectl describe deployment jenkins -n devops-tools
+                            '
                     """
                 }
             }
@@ -192,6 +199,7 @@ all:
         }
     }
 }
+
 
 
 
