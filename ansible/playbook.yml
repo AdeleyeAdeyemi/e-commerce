@@ -77,10 +77,18 @@
         mode: '0755'
       environment:
         HOME: "{{ jenkins_home }}"
+        
+    - name: Add user to docker group
+      become: yes
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
 
     - name: Start Minikube as user
-      become: no
-      shell: |
+      become: yes
+      shell: |>
         {{ jenkins_home }}/bin/minikube start --driver=docker --kubernetes-version=stable \
         --apiserver-ips={{ ansible_host }} \
         --apiserver-name={{ ansible_host }}
@@ -89,6 +97,7 @@
       environment:
         HOME: "{{ jenkins_home }}"
         PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
+
 
 
 
