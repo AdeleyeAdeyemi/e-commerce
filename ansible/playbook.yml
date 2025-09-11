@@ -85,9 +85,9 @@
         groups: docker
         append: yes
         
-    - name: Start Minikube
-      become: no
-      shell: "{{ jenkins_home }}/bin/minikube start --driver=docker --kubernetes-version=stable"
+    - name: Start Minikube (root workaround)
+      become: yes
+      shell: "{{ jenkins_home }}/bin/minikube start --driver=docker --force --kubernetes-version=stable"
       environment:
         HOME: "{{ jenkins_home }}"
         PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
@@ -120,6 +120,7 @@
 
 
     
+
 
 
 
