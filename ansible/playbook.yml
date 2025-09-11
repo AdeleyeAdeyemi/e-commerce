@@ -1,1 +1,91 @@
-- name: Setup and Deploy Flask App hosts: all become: yes tasks: - name: Install required system packages yum: name: - git - docker - python3 - conntrack - curl - tar state: present - name: Start Docker service: name: docker state: started enabled: yes - name: Install Docker Compose get_url: url: https://github.com/docker/compose/releases/download/v2.6.0/docker-compose-linux-x86_64 dest: /usr/local/bin/docker-compose mode: '0755' - name: Clone GitHub repo git: repo: https://github.com/AdeleyeAdeyemi/e-commerce.git dest: /home/ec2-user/e-commerce - name: Run Docker Compose command: /usr/local/bin/docker-compose up -d args: chdir: /home/ec2-user/e-commerce - name: Get latest kubectl version shell: curl -L -s https://dl.k8s.io/release/stable.txt register: kubectl_version changed_when: false - name: Download kubectl get_url: url: "https://dl.k8s.io/release/{{ kubectl_version.stdout }}/bin/linux/amd64/kubectl" dest: /usr/local/bin/kubectl mode: '0755' - name: Install Minikube get_url: url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 dest: /usr/local/bin/minikube mode: '0755' - name: Start Minikube shell: /usr/local/bin/minikube start --driver=docker --kubernetes-version=stable \ --apiserver-ips={{ ansible_host }} \ --apiserver-name={{ ansible_host }} args: executable: /bin/bash
+- name: Setup and Deploy Flask App
+  hosts: all
+  become: yes
+
+  vars:
+    jenkins_user: ec2-user   # Replace with 'jenkins' if you have a dedicated user
+    jenkins_home: /home/ec2-user
+
+  tasks:
+    # -------------------------------
+    # System-level setup
+    # -------------------------------
+    - name: Install required system packages
+      yum:
+        name:
+          - git
+          - docker
+          - python3
+          - conntrack
+          - curl
+          - tar
+        state: present
+
+    - name: Start Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Install Docker Compose
+      get_url:
+        url: https://github.com/docker/compose/releases/download/v2.6.0/docker-compose-linux-x86_64
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    # -------------------------------
+    # Application setup
+    # -------------------------------
+    - name: Clone GitHub repo
+      git:
+        repo: https://github.com/AdeleyeAdeyemi/e-commerce.git
+        dest: "{{ jenkins_home }}/e-commerce"
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_user }}"
+
+    - name: Run Docker Compose
+      become: no
+      shell: /usr/local/bin/docker-compose up -d
+      args:
+        chdir: "{{ jenkins_home }}/e-commerce"
+
+    # -------------------------------
+    # Kubernetes setup (jenkins user)
+    # -------------------------------
+    - name: Get latest kubectl version
+      become: no
+      shell: curl -L -s https://dl.k8s.io/release/stable.txt
+      register: kubectl_version
+      changed_when: false
+      environment:
+        HOME: "{{ jenkins_home }}"
+
+    - name: Download kubectl
+      become: no
+      get_url:
+        url: "https://dl.k8s.io/release/{{ kubectl_version.stdout }}/bin/linux/amd64/kubectl"
+        dest: "{{ jenkins_home }}/bin/kubectl"
+        mode: '0755'
+      environment:
+        HOME: "{{ jenkins_home }}"
+
+    - name: Install Minikube
+      become: no
+      get_url:
+        url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        dest: "{{ jenkins_home }}/bin/minikube"
+        mode: '0755'
+      environment:
+        HOME: "{{ jenkins_home }}"
+
+    - name: Start Minikube as user
+      become: no
+      shell: |
+        "{{ jenkins_home }}/bin/minikube start --driver=docker --kubernetes-version=stable \
+        --apiserver-ips={{ ansible_host }} \
+        --apiserver-name={{ ansible_host }}"
+      args:
+        executable: /bin/bash
+      environment:
+        HOME: "{{ jenkins_home }}"
+        PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
