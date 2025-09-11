@@ -86,7 +86,7 @@
         append: yes
         
     - name: Start Minikube
-      become: no
+      become: yes
       shell: "{{ jenkins_home }}/bin/minikube start --driver=docker --kubernetes-version=stable"
       environment:
         HOME: "{{ jenkins_home }}"
@@ -120,6 +120,7 @@
 
 
     
+
 
 
 
