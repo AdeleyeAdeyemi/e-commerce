@@ -30,15 +30,13 @@
         url: https://github.com/docker/compose/releases/download/v2.6.0/docker-compose-linux-x86_64
         dest: /usr/local/bin/docker-compose
         mode: '0755'
-
-  
-    - name: Clone GitHub repo
+        
+        - name: Clone GitHub repo
       git:
         repo: https://github.com/AdeleyeAdeyemi/e-commerce.git
-        dest:  /home/ec2-user/e-commerce 
+        dest: /home/ec2-user/e-commerce
         version: main
-     become: yes
-     become_user: ec2-user
+      become: yes
        
     - name: Run Docker Compose
       become: no
@@ -84,4 +82,5 @@
       environment:
         HOME: "{{ jenkins_home }}"
         PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
+
 
