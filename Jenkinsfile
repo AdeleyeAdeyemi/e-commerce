@@ -123,6 +123,7 @@ all:
 
                     sh """
                         ssh -o StrictHostKeyChecking=no -i ${pemFile} ec2-user@${publicIp} '
+                            export PATH=~/bin:\$PATH
                             export KUBECONFIG=~/.kube/config
                             kubectl apply -f ~/app/K8S/
                             kubectl get all -n devops-tools
@@ -191,6 +192,7 @@ all:
         }
     }
 }
+
 
 
 
