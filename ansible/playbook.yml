@@ -51,6 +51,14 @@
       changed_when: false
       environment:
         HOME: "{{ jenkins_home }}"
+        
+    - name: Ensure ~/bin directory exists
+      file:
+        path: /home/ec2-user/bin
+        state: directory
+        mode: '0755'
+        owner: ec2-user
+        group: ec2-user
 
     - name: Download kubectl
       become: no
@@ -81,6 +89,7 @@
       environment:
         HOME: "{{ jenkins_home }}"
         PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
+
 
 
 
