@@ -57,8 +57,15 @@
     - name: Start Minikube
       shell: |
         minikube start --driver=docker --kubernetes-version=stable
+      
+        minikube start --driver=docker \
+                       --apiserver-ips={{ ansible_host }} \
+                       --apiserver-name={{ ansible_host }} \
+                       --kubernetes-version=stable
+
       args:
         executable: /bin/bash
+
 
 
 
