@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         TERRAFORM_DIR       = "terraform"
-        PEM_CREDENTIALS_ID  = "aws-pem-key"   /* Jenkins credential ID for PEM file */
+        PEM_CREDENTIALS_ID  = "aws-pem-key"
         AWS_CREDENTIALS_ID  = "aws-credentials"
         BRANCH_NAME         = "main"
         REGION              = "us-west-2"
@@ -98,32 +98,39 @@ all:
             }
         }
 
-        stage('Setup Kubeconfig') {
+        stage('Setup Minikube on EC2') {
             steps {
-                withCredentials([file(credentialsId: 'kubeconfig-credentials', variable: 'KUBEZIP')]) {
-                    sh '''
-                        mkdir -p $WORKSPACE/.kube
-                        unzip -o $KUBEZIP -d $WORKSPACE/.kube
-                        chmod 600 $WORKSPACE/.kube/*
-                        sed -i "s|/home/onisowo/.minikube/ca.crt|$WORKSPACE/.kube/ca.crt|g" $WORKSPACE/.kube/config
-                        sed -i "s|/home/onisowo/.minikube/profiles/minikube/client.crt|$WORKSPACE/.kube/client.crt|g" $WORKSPACE/.kube/config
-                        sed -i "s|/home/onisowo/.minikube/profiles/minikube/client.key|$WORKSPACE/.kube/client.key|g" $WORKSPACE/.kube/config
-                        export KUBECONFIG=$WORKSPACE/.kube/config
-                        kubectl get nodes
-                    '''
+                script {
+                    def publicIp = sh(script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
+                    def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
+                    sh "chmod 600 ${pemFile}"
+
+                    sh """
+                        ssh -o StrictHostKeyChecking=no -i ${pemFile} ec2-user@${publicIp} '
+                            export KUBECONFIG=~/.kube/config
+                            kubectl get nodes
+                        '
+                    """
                 }
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy to Kubernetes on EC2') {
             steps {
-                sh '''
-                    export KUBECONFIG=$WORKSPACE/.kube/config
-                    kubectl apply -f K8S/
-                    kubectl get all -n devops-tools
-                    kubectl get pvc -n devops-tools
-                    kubectl describe deployment jenkins -n devops-tools
-                '''
+                script {
+                    def publicIp = sh(script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
+                    def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
+
+                    sh """
+                        ssh -o StrictHostKeyChecking=no -i ${pemFile} ec2-user@${publicIp} '
+                            export KUBECONFIG=~/.kube/config
+                            kubectl apply -f ~/app/K8S/
+                            kubectl get all -n devops-tools
+                            kubectl get pvc -n devops-tools
+                            kubectl describe deployment jenkins -n devops-tools
+                        '
+                    """
+                }
             }
         }
 
@@ -184,10 +191,6 @@ all:
         }
     }
 }
-
-
-
-
 
 
 
