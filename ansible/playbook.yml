@@ -34,10 +34,8 @@
     - name: Clone GitHub repo
       git:
         repo: https://github.com/AdeleyeAdeyemi/e-commerce.git
-        dest: "{{ jenkins_home }}/e-commerce"
-        owner: "{{ jenkins_user }}"
-        group: "{{ jenkins_user }}"
-
+        dest: /home/ec2-user/e-commerce
+        
     - name: Run Docker Compose
       become: no
       shell: /usr/local/bin/docker-compose up -d
@@ -81,6 +79,7 @@
       environment:
         HOME: "{{ jenkins_home }}"
         PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
+
 
 
 
