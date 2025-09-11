@@ -40,7 +40,7 @@
       become: no
       shell: /usr/local/bin/docker-compose up -d
       args:
-        chdir: "{{ jenkins_home }}/e-commerce"
+        chdir: /home/ec2-user/e-commerce 
 
     - name: Get latest kubectl version
       become: no
@@ -48,37 +48,37 @@
       register: kubectl_version
       changed_when: false
       environment:
-        HOME: "{{ jenkins_home }}"
+        HOME: /home/ec2-user/e-commerce 
 
     - name: Download kubectl
       become: no
       get_url:
         url: "https://dl.k8s.io/release/{{ kubectl_version.stdout }}/bin/linux/amd64/kubectl"
-        dest: "{{ jenkins_home }}/bin/kubectl"
+        dest: /home/ec2-user/e-commerce/bin/kubectl
         mode: '0755'
       environment:
-        HOME: "{{ jenkins_home }}"
+        HOME: /home/ec2-user/e-commerce  
 
     - name: Install Minikube
       become: no
       get_url:
         url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-        dest: "{{ jenkins_home }}/bin/minikube"
+        dest: /home/ec2-user/e-commerce /bin/minikube
         mode: '0755'
       environment:
-        HOME: "{{ jenkins_home }}"
-
+        HOME: /home/ec2-user/e-commerce  
     - name: Start Minikube as Jenkins user
       become: no
       shell: |
-        "{{ jenkins_home }}/bin/minikube start --driver=docker --kubernetes-version=stable \
+        /home/ec2-user/e-commerce/bin/minikube start --driver=docker --kubernetes-version=stable \
         --apiserver-ips={{ ansible_host }} \
         --apiserver-name={{ ansible_host }}"
       args:
         executable: /bin/bash
       environment:
-        HOME: "{{ jenkins_home }}"
-        PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
+        HOME: /home/ec2-user/e-commerce 
+        PATH: /home/ec2-user/e-commerce /bin:{{ ansible_env.PATH }}
+
 
 
 
