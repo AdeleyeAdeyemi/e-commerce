@@ -86,17 +86,20 @@
         append: yes
 
 
-    - name: Start Minikube as user
+    - name: Start Minikube as user with updated group
       become: no
       shell: >
+        newgrp docker <<EOF
         {{ jenkins_home }}/bin/minikube start --driver=docker --kubernetes-version=stable \
         --apiserver-ips={{ ansible_host }} \
         --apiserver-name={{ ansible_host }}
+        EOF
       args:
         executable: /bin/bash
       environment:
         HOME: "{{ jenkins_home }}"
         PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
+
 
 
 
