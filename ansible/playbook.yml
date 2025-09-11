@@ -50,8 +50,8 @@
 
     - name: Install Minikube
       get_url:
-        url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-        dest: /usr/local/bin/minikube
+        url: https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+        dest: /usr/local/bin/kubectl
         mode: '0755'
 
     - name: Start Minikube
@@ -65,6 +65,7 @@
 
       args:
         executable: /bin/bash
+
 
 
 
