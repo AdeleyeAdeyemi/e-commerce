@@ -2,7 +2,12 @@
   hosts: all
   become: yes
 
+  vars:
+    jenkins_user: jenkins
+    jenkins_home: /home/jenkins
+
   tasks:
+   
     - name: Install required system packages
       yum:
         name:
@@ -29,36 +34,53 @@
     - name: Clone GitHub repo
       git:
         repo: https://github.com/AdeleyeAdeyemi/e-commerce.git
-        dest: /home/ec2-user/e-commerce
+        dest: "{{ jenkins_home }}/e-commerce"
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_user }}"
 
     - name: Run Docker Compose
-      command: /usr/local/bin/docker-compose up -d
+      become: no
+      shell: /usr/local/bin/docker-compose up -d
       args:
-        chdir: /home/ec2-user/e-commerce
+        chdir: "{{ jenkins_home }}/e-commerce"
 
     - name: Get latest kubectl version
+      become: no
       shell: curl -L -s https://dl.k8s.io/release/stable.txt
       register: kubectl_version
       changed_when: false
+      environment:
+        HOME: "{{ jenkins_home }}"
 
     - name: Download kubectl
+      become: no
       get_url:
         url: "https://dl.k8s.io/release/{{ kubectl_version.stdout }}/bin/linux/amd64/kubectl"
-        dest: /usr/local/bin/kubectl
+        dest: "{{ jenkins_home }}/bin/kubectl"
         mode: '0755'
+      environment:
+        HOME: "{{ jenkins_home }}"
 
     - name: Install Minikube
+      become: no
       get_url:
         url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-        dest: /usr/local/bin/minikube
+        dest: "{{ jenkins_home }}/bin/minikube"
         mode: '0755'
+      environment:
+        HOME: "{{ jenkins_home }}"
 
-    - name: Start Minikube
-      shell:  /usr/local/bin/minikube start --driver=docker --kubernetes-version=stable \
-                       --apiserver-ips={{ ansible_host }} \
-                       --apiserver-name={{ ansible_host }}
+    - name: Start Minikube as Jenkins user
+      become: no
+      shell: |
+        "{{ jenkins_home }}/bin/minikube start --driver=docker --kubernetes-version=stable \
+        --apiserver-ips={{ ansible_host }} \
+        --apiserver-name={{ ansible_host }}"
       args:
         executable: /bin/bash
+      environment:
+        HOME: "{{ jenkins_home }}"
+        PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
 
 
 
