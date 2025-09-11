@@ -119,7 +119,7 @@ all:
             steps {
                 sh '''
                     export KUBECONFIG=$WORKSPACE/.kube/config
-                    kubectl apply -f k8s/
+                    kubectl apply -f K8S/
                     kubectl get all -n devops-tools
                     kubectl get pvc -n devops-tools
                     kubectl describe deployment jenkins -n devops-tools
@@ -184,6 +184,7 @@ all:
         }
     }
 }
+
 
 
 
