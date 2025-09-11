@@ -39,7 +39,7 @@
       become: yes
 
     - name: Run Docker Compose
-      become: no
+      become: yes
       shell: /usr/local/bin/docker-compose up -d
       args:
         chdir: "{{ jenkins_home }}/e-commerce"
@@ -81,6 +81,7 @@
       environment:
         HOME: "{{ jenkins_home }}"
         PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
+
 
 
 
