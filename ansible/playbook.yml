@@ -87,7 +87,7 @@
         
     - name: Start Minikube
       become: yes
-      shell: "{{ jenkins_home }}/bin/minikube start --driver=none --kubernetes-version=stable"
+      shell: "{{ jenkins_home }}/bin/minikube start --driver=docker --kubernetes-version=stable"
       environment:
         HOME: "{{ jenkins_home }}"
         PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
@@ -120,6 +120,7 @@
 
 
     
+
 
 
 
