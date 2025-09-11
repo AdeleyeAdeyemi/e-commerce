@@ -88,7 +88,7 @@
 
     - name: Start Minikube as user
       become: yes
-      shell: |>
+      shell: >
         {{ jenkins_home }}/bin/minikube start --driver=docker --kubernetes-version=stable \
         --apiserver-ips={{ ansible_host }} \
         --apiserver-name={{ ansible_host }}
@@ -97,6 +97,7 @@
       environment:
         HOME: "{{ jenkins_home }}"
         PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
+
 
 
 
