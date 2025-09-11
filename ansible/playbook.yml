@@ -7,7 +7,7 @@
     jenkins_home: /home/ec2-user
 
   tasks:
-   
+
     - name: Install required system packages
       yum:
         name:
@@ -30,21 +30,20 @@
         url: https://github.com/docker/compose/releases/download/v2.6.0/docker-compose-linux-x86_64
         dest: /usr/local/bin/docker-compose
         mode: '0755'
-        
-        - name: Clone GitHub repo
+
+    - name: Clone GitHub repo
       git:
         repo: https://github.com/AdeleyeAdeyemi/e-commerce.git
         dest: /home/ec2-user/e-commerce
         version: main
       become: yes
-       
+
     - name: Run Docker Compose
       become: no
       shell: /usr/local/bin/docker-compose up -d
       args:
         chdir: "{{ jenkins_home }}/e-commerce"
 
-   
     - name: Get latest kubectl version
       become: no
       shell: curl -L -s https://dl.k8s.io/release/stable.txt
@@ -82,5 +81,7 @@
       environment:
         HOME: "{{ jenkins_home }}"
         PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
+
+
 
 
