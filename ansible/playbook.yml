@@ -9,6 +9,9 @@
           - git
           - docker
           - python3
+          - conntrack
+          - curl
+          - tar
         state: present
 
     - name: Start Docker
@@ -32,6 +35,31 @@
       command: /usr/local/bin/docker-compose up -d
       args:
         chdir: /home/ec2-user/e-commerce
+
+    - name: Install kubectl
+      get_url:
+        url: https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
+        dest: /usr/local/bin/kubectl
+      register: kubectl_download
+
+    - name: Make kubectl executable
+      file:
+        path: /usr/local/bin/kubectl
+        mode: '0755'
+      when: kubectl_download is changed
+
+    - name: Install Minikube
+      get_url:
+        url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        dest: /usr/local/bin/minikube
+        mode: '0755'
+
+    - name: Start Minikube
+      shell: |
+        minikube start --driver=docker --kubernetes-version=stable
+      args:
+        executable: /bin/bash
+
 
 
 
