@@ -84,23 +84,42 @@
         name: "{{ ansible_user }}"
         groups: docker
         append: yes
-
-
-    - name: Start Minikube as user with updated group
+        
+    - name: Start Minikube
       become: no
-      shell: >
-        newgrp docker <<EOF
-        {{ jenkins_home }}/bin/minikube start --driver=docker --kubernetes-version=stable \
-        --apiserver-ips={{ ansible_host }} \
-        --apiserver-name={{ ansible_host }}
-        EOF
-      args:
-        executable: /bin/bash
+      shell: "{{ jenkins_home }}/bin/minikube start --driver=docker --kubernetes-version=stable"
       environment:
         HOME: "{{ jenkins_home }}"
         PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
 
+    - name: Ensure ~/app/K8S directory exists
+      file:
+        path: "{{ jenkins_home }}/app/K8S"
+        state: directory
+        mode: '0755'
+        owner: ec2-user
+        group: ec2-user
 
+    - name: Copy Kubernetes manifests
+      copy:
+        src: "{{ jenkins_home }}/e-commerce/K8S/"
+        dest: "{{ jenkins_home }}/app/K8S/"
+        owner: ec2-user
+        group: ec2-user
+        mode: '0755'
+
+    - name: Apply K8S manifests
+      shell: "{{ jenkins_home }}/bin/kubectl apply -f {{ jenkins_home }}/app/K8S/"
+      environment:
+        KUBECONFIG: "{{ jenkins_home }}/.kube/config"
+
+    - name: Verify Minikube nodes
+      shell: "{{ jenkins_home }}/bin/kubectl get nodes"
+      environment:
+        KUBECONFIG: "{{ jenkins_home }}/.kube/config"
+
+
+    
 
 
 
