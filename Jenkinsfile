@@ -2,12 +2,12 @@ pipeline {
     agent any
 
     environment {
-        TERRAFORM_DIR = "terraform"
-        PEM_CREDENTIALS_ID = "aws-pem-key"   /* Jenkins credential ID for PEM file */
-        AWS_CREDENTIALS_ID = "aws-credentials"
-        BRANCH_NAME = "main"
-        REGION = "us-west-2"
-        IMAGE_TAG = "latest"
+        TERRAFORM_DIR       = "terraform"
+        PEM_CREDENTIALS_ID  = "aws-pem-key"
+        AWS_CREDENTIALS_ID  = "aws-credentials"
+        BRANCH_NAME         = "main"
+        REGION              = "us-west-2"
+        IMAGE_TAG           = "latest"
     }
 
     stages {
@@ -60,7 +60,7 @@ all:
       ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
 """
                     writeFile file: 'inventory_generated.yml', text: inventory
-                    echo "Ansible inventory created:\n${inventory}"
+                    echo "Ansible inventory created:\\n${inventory}"
                 }
             }
         }
@@ -74,7 +74,6 @@ all:
         stage('Build & Run Docker') {
             steps {
                 sh 'docker compose up -d --remove-orphans'
-               
             }
         } 
 
@@ -99,12 +98,57 @@ all:
             }
         }
 
+        stage('Setup Minikube on EC2') {
+            steps {
+                script {
+                    def publicIp = sh(script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
+                    def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
+                    sh "chmod 600 ${pemFile}"
+
+                    sh """
+                        ssh -o StrictHostKeyChecking=no -i ${pemFile} ec2-user@${publicIp} '
+                            export PATH=~/bin:\$PATH
+                            export KUBECONFIG=~/.kube/config
+                            echo "Kubectl version:"
+                            kubectl version --client
+                            echo "Deploying K8S manifests..."
+                            kubectl apply -f ~/app/K8S/
+                            kubectl get all -n devops-tools
+                            kubectl get pvc -n devops-tools
+                            kubectl describe deployment jenkins -n devops-tools
+                            '
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes on EC2') {
+            steps {
+                script {
+                    def publicIp = sh(script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
+                    def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
+
+                    sh """
+                        ssh -o StrictHostKeyChecking=no -i ${pemFile} ec2-user@${publicIp} '
+                            export PATH=~/bin:\$PATH
+                            export KUBECONFIG=~/.kube/config
+                            kubectl apply -f ~/app/K8S/
+                            kubectl get all -n devops-tools
+                            kubectl get pvc -n devops-tools
+                            kubectl describe deployment jenkins -n devops-tools
+                        '
+                    """
+                }
+            }
+        }
+
         stage('Push to Docker Hub') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-credentials', 
                     usernameVariable: 'DOCKER_USER', 
-                    passwordVariable: 'DOCKER_PASS')]) {
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
                     sh """
                         echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
                         docker tag ecommerce-app:latest \$DOCKER_USER/ecommerce-app:${IMAGE_TAG}
@@ -145,6 +189,7 @@ all:
                 '''
             }
         }
+
     }
 
     post {
@@ -154,6 +199,15 @@ all:
         }
     }
 }
+
+
+
+
+
+
+
+
+
 
 
 

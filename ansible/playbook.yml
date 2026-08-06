@@ -2,13 +2,21 @@
   hosts: all
   become: yes
 
+  vars:
+    jenkins_user: ec2-user   # Replace with 'jenkins' if you have a dedicated user
+    jenkins_home: /home/ec2-user
+
   tasks:
+
     - name: Install required system packages
       yum:
         name:
           - git
           - docker
           - python3
+          - conntrack
+          - curl
+          - tar
         state: present
 
     - name: Start Docker
@@ -27,11 +35,102 @@
       git:
         repo: https://github.com/AdeleyeAdeyemi/e-commerce.git
         dest: /home/ec2-user/e-commerce
+        version: main
+      become: yes
 
     - name: Run Docker Compose
-      command: /usr/local/bin/docker-compose up -d
+      become: yes
+      shell: /usr/local/bin/docker-compose up -d
       args:
-        chdir: /home/ec2-user/e-commerce
+        chdir: "{{ jenkins_home }}/e-commerce"
+
+    - name: Get latest kubectl version
+      become: no
+      shell: curl -L -s https://dl.k8s.io/release/stable.txt
+      register: kubectl_version
+      changed_when: false
+      environment:
+        HOME: "{{ jenkins_home }}"
+        
+    - name: Ensure ~/bin directory exists
+      file:
+        path: /home/ec2-user/bin
+        state: directory
+        mode: '0755'
+        owner: ec2-user
+        group: ec2-user
+
+    - name: Download kubectl
+      become: no
+      get_url:
+        url: "https://dl.k8s.io/release/{{ kubectl_version.stdout }}/bin/linux/amd64/kubectl"
+        dest: "{{ jenkins_home }}/bin/kubectl"
+        mode: '0755'
+      environment:
+        HOME: "{{ jenkins_home }}"
+
+    - name: Install Minikube
+      become: no
+      get_url:
+        url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        dest: "{{ jenkins_home }}/bin/minikube"
+        mode: '0755'
+      environment:
+        HOME: "{{ jenkins_home }}"
+        
+    - name: Add user to docker group
+      become: yes
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+        
+    - name: Start Minikube (root workaround)
+      become: yes
+      shell: "{{ jenkins_home }}/bin/minikube start --driver=docker --force --kubernetes-version=stable"
+      environment:
+        HOME: "{{ jenkins_home }}"
+        PATH: "{{ jenkins_home }}/bin:{{ ansible_env.PATH }}"
+
+    - name: Ensure ~/app/K8S directory exists
+      file:
+        path: "{{ jenkins_home }}/app/K8S"
+        state: directory
+        mode: '0755'
+        owner: ec2-user
+        group: ec2-user
+
+    - name: Copy Kubernetes manifests
+      copy:
+        src: "{{ jenkins_home }}/e-commerce/K8S/"
+        dest: "{{ jenkins_home }}/app/K8S/"
+        owner: ec2-user
+        group: ec2-user
+        mode: '0755'
+
+    - name: Apply K8S manifests
+      shell: "{{ jenkins_home }}/bin/kubectl apply -f {{ jenkins_home }}/app/K8S/"
+      environment:
+        KUBECONFIG: "{{ jenkins_home }}/.kube/config"
+
+    - name: Verify Minikube nodes
+      shell: "{{ jenkins_home }}/bin/kubectl get nodes"
+      environment:
+        KUBECONFIG: "{{ jenkins_home }}/.kube/config"
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
 
 
 

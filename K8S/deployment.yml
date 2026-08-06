@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-app
+  labels:
+    app: ecommerce
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ecommerce
+  template:
+    metadata:
+      labels:
+        app: ecommerce
+    spec:
+      containers:
+        - name: ecommerce-app
+          image: adeleyeade/ecommerce-app:latest   # 👈 replace with your Docker Hub repo
+          ports:
+            - containerPort: 5000
+          env:
+            - name: FLASK_ENV
+              value: "production"
