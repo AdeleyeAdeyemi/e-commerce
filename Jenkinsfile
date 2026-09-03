@@ -6,7 +6,7 @@ pipeline {
         PEM_CREDENTIALS_ID  = "aws-pem-key"
         AWS_CREDENTIALS_ID  = "terraform_autho"
         BRANCH_NAME         = "main"
-        REGION              = "us-west-2"
+        REGION              = "us-east-2"
         IMAGE_TAG           = "latest"
     }
 
