@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        TERRAFORM_DIR       = "Terraform_module"
+        TERRAFORM_DIR       =  "Terraform_module/terraform_project/environments/dev"
         PEM_CREDENTIALS_ID  = "aws-pem-key"
         AWS_CREDENTIALS_ID  = "terraform_autho"
         BRANCH_NAME         = "main"
@@ -35,8 +35,12 @@ pipeline {
                 ]) {
                     dir("${TERRAFORM_DIR}") {
                         sh '''
-                            terraform init
-                            terraform apply -auto-approve
+                             set -e
+                             echo "Terraform directory: $(pwd)"
+                             ls -la
+
+                             terraform init
+                             terraform apply -auto-approve -var-file=terraform.tfvars
                         '''
                     }
                 }
@@ -101,7 +105,7 @@ all:
         stage('Setup Minikube on EC2') {
             steps {
                 script {
-                    def publicIp = sh(script: "Terraform_module -chdir=${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
+                    def publicIp = sh(script: "Terraform_module/terraform_project/environments/dev -chdir=${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
                     def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
                     sh "chmod 600 ${pemFile}"
 
@@ -125,7 +129,7 @@ all:
         stage('Deploy to Kubernetes on EC2') {
             steps {
                 script {
-                    def publicIp = sh(script: "Terraform_module -chdir=${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
+                    def publicIp = sh(script: "Terraform_module/terraform_project/environments/dev -chdir=${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
                     def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
 
                     sh """
