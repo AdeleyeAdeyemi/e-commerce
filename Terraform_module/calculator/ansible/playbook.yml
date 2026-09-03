@@ -1,0 +1,39 @@
+- name: Setup and Deploy Flask App
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Install required system packages
+      yum:
+        name:
+          - git
+          - docker
+          - python3
+        state: present
+
+    - name: Start Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Install Docker Compose v2 (plugin method)
+      shell: |
+        mkdir -p /usr/libexec/docker/cli-plugins
+        curl -SL https://github.com/docker/compose/releases/download/v2.6.0/docker-compose-linux-x86_64 -o /usr/libexec/docker/cli-plugins/docker-compose
+        chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+      args:
+        executable: /bin/bash
+
+    - name: Clone GitHub repo
+      git:
+        repo: https://github.com/AdeleyeAdeyemi/calculator.git
+        dest: /home/ec2-user/calculator
+
+    - name: Run Docker Compose
+      command: docker compose up -d
+      args:
+        chdir: /home/ec2-user/calculator
+
+
+
