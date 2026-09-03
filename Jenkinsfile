@@ -41,10 +41,8 @@ pipeline {
 
                              terraform init -reconfigure
                              terraform validate
-                             terraform apply -auto-approve  \
-                            -var="environment=dev" \
-                            -var="aws_region=${REGION}" \
-                            -var="project_name=e-commerce"
+                             terraform apply -auto-approve 
+                           
                         '''
                     }
                 }
