@@ -39,8 +39,10 @@ pipeline {
                              echo "Terraform directory: $(pwd)"
                              ls -la
 
-                             terraform init
-                             terraform apply -auto-approve -var-file=terraform.tfvars
+                             terraform init -reconfigure
+                             terraform validate
+                             terraform apply -auto-approve \
+                            -var-file=environments/dev/terraform.tfvars
                         '''
                     }
                 }
