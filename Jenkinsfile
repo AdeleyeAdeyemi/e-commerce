@@ -41,8 +41,7 @@ pipeline {
 
                              terraform init -reconfigure
                              terraform validate
-                             terraform apply -auto-approve \
-                            -var-file=environments/dev/terraform.tfvars
+                             terraform apply -auto-approve
                         '''
                     }
                 }
