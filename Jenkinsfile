@@ -4,7 +4,7 @@ pipeline {
     environment {
         TERRAFORM_DIR       = "terraform"
         PEM_CREDENTIALS_ID  = "aws-pem-key"
-        AWS_CREDENTIALS_ID  = "aws-credentials"
+        AWS_CREDENTIALS_ID  = "terraform_autho"
         BRANCH_NAME         = "main"
         REGION              = "us-west-2"
         IMAGE_TAG           = "latest"
