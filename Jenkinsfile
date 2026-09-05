@@ -19,7 +19,8 @@ pipeline {
                     branches: [[name: "*/${BRANCH_NAME}"]],
                     userRemoteConfigs: [[
                         url: 'https://github.com/AdeleyeAdeyemi/e-commerce',
-                        credentialsId: "${AWS_CREDENTIALS_ID}"
+                        credentialsId: 'github-credentials'
+                        
                     ]]
                 ])
             }
