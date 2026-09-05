@@ -6,10 +6,10 @@ pipeline {
 
 
     environment {
-        TERRAFORM_DIR       =  "Terraform_module/terraform_project/environments/dev"
+        TERRAFORM_DIR       =  "Terraform_module/terraform_project"
         PEM_CREDENTIALS_ID  = "aws-pem-key"
         AWS_CREDENTIALS_ID  = "terraform_autho"
-        GITHUB_CREDENTIALS_ID = "${AWS_CREDENTIALS_ID}"
+        GITHUB_CREDENTIALS_ID = "github-credentials"
         BRANCH_NAME         = "main"
         REGION              = "us-east-2"
         IMAGE_TAG           = "latest"
@@ -23,7 +23,7 @@ pipeline {
                     branches: [[name: "*/${BRANCH_NAME}"]],
                     userRemoteConfigs: [[
                         url: 'https://github.com/AdeleyeAdeyemi/e-commerce',
-                        credentialsId:  "${AWS_CREDENTIALS_ID}"
+                        credentialsId: "${GITHUB_CREDENTIALS_ID}"
                         
                     ]]
                 ])
@@ -42,23 +42,36 @@ pipeline {
                 ]) {
                     dir("${TERRAFORM_DIR}") {
                         sh '''
+                           
                              set -e
-                             echo "Terraform directory: $(pwd)"
-                             ls -la
-                             echo "Environment files:"
-                             ls -la environments/dev || true
-                             cp "$TFVARS_FILE" environments/dev/terraform.tfvars
-  
-                           
 
-                             terraform init -reconfigure
-                             terraform validate
-                             terraform apply \
-                                 -auto-approve \
-                                 -var-file=environments/dev/terraform.tfvars
-            
-                             rm -f environments/dev/terraform.tfvars
-                           
+                            trap 'rm -f environments/dev/terraform.tfvars' EXIT
+
+                            echo "Terraform directory:"
+                            pwd
+
+                            echo "Terraform files:"
+                            ls -la
+
+                            echo "Environment directory:"
+                            ls -la environments/dev || true
+
+                            echo "Copying Terraform variables..."
+                            cp "$TFVARS_FILE" environments/dev/terraform.tfvars
+
+                            echo "Initializing Terraform..."
+                            terraform init -reconfigure
+
+                            echo "Validating Terraform..."
+                            terraform validate
+
+                            echo "Applying Terraform..."
+                            terraform apply \
+                                -auto-approve \
+                                -var-file=environments/dev/terraform.tfvars
+
+                            echo "Terraform apply completed successfully."
+                             
                         '''
                     }
                 }
