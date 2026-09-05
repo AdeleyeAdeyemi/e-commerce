@@ -5,6 +5,7 @@ pipeline {
         TERRAFORM_DIR       =  "Terraform_module/terraform_project/environments/dev"
         PEM_CREDENTIALS_ID  = "aws-pem-key"
         AWS_CREDENTIALS_ID  = "terraform_autho"
+        GITHUB_CREDENTIALS_ID = "github-credentials"
         BRANCH_NAME         = "main"
         REGION              = "us-east-2"
         IMAGE_TAG           = "latest"
@@ -39,14 +40,19 @@ pipeline {
                              set -e
                              echo "Terraform directory: $(pwd)"
                              ls -la
-                             cp "$TFVARS_FILE" terraform.tfvars
+                             echo "Environment files:"
+                             ls -la environments/dev || true
+                             cp "$TFVARS_FILE" environments/dev/terraform.tfvars
+  
+                           
 
                              terraform init -reconfigure
                              terraform validate
-                             terraform apply -auto-approve -var-file=terraform.tfvars
-
-                             rm -f terraform.tfvars
-                          
+                             terraform apply \
+                                 -auto-approve \
+                                 -var-file=environments/dev/terraform.tfvars
+            
+                             rm -f environments/dev/terraform.tfvars
                            
                         '''
                     }
