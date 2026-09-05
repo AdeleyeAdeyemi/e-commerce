@@ -32,16 +32,21 @@ pipeline {
                         usernameVariable: 'AWS_ACCESS_KEY_ID',
                         passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                     )
+                     file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')
                 ]) {
                     dir("${TERRAFORM_DIR}") {
                         sh '''
                              set -e
                              echo "Terraform directory: $(pwd)"
                              ls -la
+                             cp "$TFVARS_FILE" terraform.tfvars
 
                              terraform init -reconfigure
                              terraform validate
-                             terraform apply -auto-approve 
+                             terraform apply -auto-approve -var-file=terraform.tfvars
+
+                             rm -f terraform.tfvars
+                          
                            
                         '''
                     }
