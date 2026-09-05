@@ -44,37 +44,38 @@ pipeline {
                         sh '''
                            
                              set -e
-
+                             set -e
+                    
                             trap 'rm -f environments/dev/terraform.tfvars tfplan' EXIT
-
+                    
                             echo "Terraform directory:"
                             pwd
-
+                    
                             echo "Terraform files:"
                             ls -la
-
+                    
                             echo "Environment directory:"
                             ls -la environments/dev || true
-
+                    
                             echo "Copying Terraform variables..."
                             cp "$TFVARS_FILE" environments/dev/terraform.tfvars
-
+                    
                             echo "Initializing Terraform..."
                             terraform init -reconfigure
-
+                    
                             echo "Validating Terraform..."
                             terraform validate
-
-                            echo "Applying Terraform..."
-                            terraform apply \
-                                -auto-approve \
-                                -var-file=environments/dev/terraform.tfvars  \
+                    
+                            echo "Planning Terraform..."
+                            terraform plan \
+                                -var-file=environments/dev/terraform.tfvars \
                                 -out=tfplan
-                                echo "Applying Terraform plan..."
-                                terraform apply -auto-approve tfplan
-
-
+                    
+                            echo "Applying Terraform plan..."
+                            terraform apply -auto-approve tfplan
+                    
                             echo "Terraform apply completed successfully."
+
                              
                         '''
                     }
