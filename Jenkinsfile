@@ -1,5 +1,9 @@
 pipeline {
     agent any
+    options {
+        skipDefaultCheckout()
+    }
+
 
     environment {
         TERRAFORM_DIR       =  "Terraform_module/terraform_project/environments/dev"
