@@ -45,7 +45,7 @@ pipeline {
                            
                              set -e
 
-                            trap 'rm -f environments/dev/terraform.tfvars' EXIT
+                            trap 'rm -f environments/dev/terraform.tfvars tfplan' EXIT
 
                             echo "Terraform directory:"
                             pwd
@@ -68,7 +68,11 @@ pipeline {
                             echo "Applying Terraform..."
                             terraform apply \
                                 -auto-approve \
-                                -var-file=environments/dev/terraform.tfvars
+                                -var-file=environments/dev/terraform.tfvars  \
+                                -out=tfplan
+                                echo "Applying Terraform plan..."
+                                terraform apply -auto-approve tfplan
+
 
                             echo "Terraform apply completed successfully."
                              
