@@ -5,7 +5,7 @@ pipeline {
         TERRAFORM_DIR       =  "Terraform_module/terraform_project/environments/dev"
         PEM_CREDENTIALS_ID  = "aws-pem-key"
         AWS_CREDENTIALS_ID  = "terraform_autho"
-        GITHUB_CREDENTIALS_ID = "github-credentials"
+        GITHUB_CREDENTIALS_ID = "${AWS_CREDENTIALS_ID}"
         BRANCH_NAME         = "main"
         REGION              = "us-east-2"
         IMAGE_TAG           = "latest"
@@ -19,7 +19,7 @@ pipeline {
                     branches: [[name: "*/${BRANCH_NAME}"]],
                     userRemoteConfigs: [[
                         url: 'https://github.com/AdeleyeAdeyemi/e-commerce',
-                        credentialsId: 'github-credentials'
+                        credentialsId:  "${AWS_CREDENTIALS_ID}"
                         
                     ]]
                 ])
