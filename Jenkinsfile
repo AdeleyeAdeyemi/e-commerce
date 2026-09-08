@@ -211,12 +211,6 @@ all:
             }
         }
 
-        stage('Build & Run Docker') {
-            steps {
-                sh 'docker compose up -d --remove-orphans'
-            }
-        }
-
         stage('Verify Image') {
             steps {
                 sh '''
