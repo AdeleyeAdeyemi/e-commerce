@@ -83,6 +83,64 @@ pipeline {
             }
         }
 
+        post {
+        failure {
+            withCredentials([
+                usernamePassword(
+                    credentialsId: "${AWS_CREDENTIALS_ID}",
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                ),
+                file(
+                    credentialsId: 'terraform-tfvars',
+                    variable: 'TFVARS_FILE'
+                )
+            ]) {
+                dir("${TERRAFORM_DIR}") {
+                    sh '''
+                        set +e
+
+                        echo "========================================"
+                        echo "Terraform deployment FAILED"
+                        echo "Starting automatic Terraform cleanup..."
+                        echo "========================================"
+
+                        cp "$TFVARS_FILE" environments/dev/terraform.tfvars
+
+                        terraform init -reconfigure
+
+                        echo "Current Terraform state:"
+                        terraform state list || true
+
+                        echo "Destroying resources created by Terraform..."
+                        terraform destroy \
+                            -auto-approve \
+                            -var-file=environments/dev/terraform.tfvars
+
+                        DESTROY_STATUS=$?
+
+                        if [ "$DESTROY_STATUS" -eq 0 ]; then
+                            echo "========================================"
+                            echo "Terraform cleanup completed successfully."
+                            echo "========================================"
+                        else
+                            echo "========================================"
+                            echo "WARNING: Terraform cleanup FAILED."
+                            echo "Resources may still exist in AWS."
+                            echo "========================================"
+                        fi
+
+                        rm -f environments/dev/terraform.tfvars
+                        rm -f tfplan
+
+                        exit 0
+                    '''
+                }
+            }
+        }
+    }
+}
+
         stage('Prepare Ansible Inventory') {
             steps {
                 script {
