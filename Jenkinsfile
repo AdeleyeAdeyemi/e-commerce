@@ -1,30 +1,31 @@
+```groovy
 pipeline {
     agent any
+
     options {
         skipDefaultCheckout()
     }
 
-
     environment {
-        TERRAFORM_DIR       =  "Terraform_module/terraform_project"
-        PEM_CREDENTIALS_ID  = "aws-pem-key"
-        AWS_CREDENTIALS_ID  = "terraform_autho"
-        GITHUB_CREDENTIALS_ID = "github-credentials"
-        BRANCH_NAME         = "main"
-        REGION              = "us-east-2"
-        IMAGE_TAG           = "latest"
+        TERRAFORM_DIR          = "Terraform_module/terraform_project"
+        PEM_CREDENTIALS_ID     = "aws-pem-key"
+        AWS_CREDENTIALS_ID     = "terraform_autho"
+        GITHUB_CREDENTIALS_ID  = "github-credentials"
+        BRANCH_NAME            = "main"
+        REGION                 = "us-east-2"
+        IMAGE_TAG              = "latest"
     }
 
     stages {
 
         stage('Checkout SCM') {
             steps {
-                checkout([$class: 'GitSCM',
+                checkout([
+                    $class: 'GitSCM',
                     branches: [[name: "*/${BRANCH_NAME}"]],
                     userRemoteConfigs: [[
                         url: 'https://github.com/AdeleyeAdeyemi/e-commerce',
                         credentialsId: "${GITHUB_CREDENTIALS_ID}"
-                        
                     ]]
                 ])
             }
@@ -38,114 +39,125 @@ pipeline {
                         usernameVariable: 'AWS_ACCESS_KEY_ID',
                         passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                     ),
-                     file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')
+                    file(
+                        credentialsId: 'terraform-tfvars',
+                        variable: 'TFVARS_FILE'
+                    )
                 ]) {
                     dir("${TERRAFORM_DIR}") {
                         sh '''
-                           
-                             set -e
-                             set -e
-                    
+                            set -e
+
                             trap 'rm -f environments/dev/terraform.tfvars tfplan' EXIT
-                    
+
+                            echo "========================================"
                             echo "Terraform directory:"
                             pwd
-                    
+                            echo "========================================"
+
                             echo "Terraform files:"
                             ls -la
-                    
+
                             echo "Environment directory:"
                             ls -la environments/dev || true
-                    
+
                             echo "Copying Terraform variables..."
                             cp "$TFVARS_FILE" environments/dev/terraform.tfvars
-                    
+
                             echo "Initializing Terraform..."
                             terraform init -reconfigure
-                    
+
                             echo "Validating Terraform..."
                             terraform validate
-                    
+
                             echo "Planning Terraform..."
                             terraform plan \
                                 -var-file=environments/dev/terraform.tfvars \
                                 -out=tfplan
-                    
+
                             echo "Applying Terraform plan..."
                             terraform apply -auto-approve tfplan
-                    
-                            echo "Terraform apply completed successfully."
 
-                             
+                            echo "Terraform apply completed successfully."
                         '''
+                    }
+                }
+            }
+
+            post {
+                failure {
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: "${AWS_CREDENTIALS_ID}",
+                            usernameVariable: 'AWS_ACCESS_KEY_ID',
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                        ),
+                        file(
+                            credentialsId: 'terraform-tfvars',
+                            variable: 'TFVARS_FILE'
+                        )
+                    ]) {
+                        dir("${TERRAFORM_DIR}") {
+                            sh '''
+                                set +e
+
+                                echo "========================================"
+                                echo "TERRAFORM DEPLOYMENT FAILED"
+                                echo "Starting automatic Terraform cleanup..."
+                                echo "========================================"
+
+                                cp "$TFVARS_FILE" environments/dev/terraform.tfvars
+
+                                echo "Re-initializing Terraform..."
+                                terraform init -reconfigure
+
+                                echo "Resources currently in Terraform state:"
+                                terraform state list || true
+
+                                echo "========================================"
+                                echo "DESTROYING TERRAFORM RESOURCES"
+                                echo "========================================"
+
+                                terraform destroy \
+                                    -auto-approve \
+                                    -var-file=environments/dev/terraform.tfvars
+
+                                DESTROY_STATUS=$?
+
+                                if [ "$DESTROY_STATUS" -eq 0 ]; then
+                                    echo "========================================"
+                                    echo "Terraform cleanup completed successfully."
+                                    echo "No Terraform-managed resources should remain."
+                                    echo "========================================"
+                                else
+                                    echo "========================================"
+                                    echo "WARNING: Terraform cleanup FAILED."
+                                    echo "Resources may still exist in AWS."
+                                    echo "Check AWS resources manually."
+                                    echo "========================================"
+                                fi
+
+                                rm -f environments/dev/terraform.tfvars
+                                rm -f tfplan
+
+                                exit 0
+                            '''
+                        }
                     }
                 }
             }
         }
 
-        post {
-        failure {
-            withCredentials([
-                usernamePassword(
-                    credentialsId: "${AWS_CREDENTIALS_ID}",
-                    usernameVariable: 'AWS_ACCESS_KEY_ID',
-                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                ),
-                file(
-                    credentialsId: 'terraform-tfvars',
-                    variable: 'TFVARS_FILE'
-                )
-            ]) {
-                dir("${TERRAFORM_DIR}") {
-                    sh '''
-                        set +e
-
-                        echo "========================================"
-                        echo "Terraform deployment FAILED"
-                        echo "Starting automatic Terraform cleanup..."
-                        echo "========================================"
-
-                        cp "$TFVARS_FILE" environments/dev/terraform.tfvars
-
-                        terraform init -reconfigure
-
-                        echo "Current Terraform state:"
-                        terraform state list || true
-
-                        echo "Destroying resources created by Terraform..."
-                        terraform destroy \
-                            -auto-approve \
-                            -var-file=environments/dev/terraform.tfvars
-
-                        DESTROY_STATUS=$?
-
-                        if [ "$DESTROY_STATUS" -eq 0 ]; then
-                            echo "========================================"
-                            echo "Terraform cleanup completed successfully."
-                            echo "========================================"
-                        else
-                            echo "========================================"
-                            echo "WARNING: Terraform cleanup FAILED."
-                            echo "Resources may still exist in AWS."
-                            echo "========================================"
-                        fi
-
-                        rm -f environments/dev/terraform.tfvars
-                        rm -f tfplan
-
-                        exit 0
-                    '''
-                }
-            }
-        }
-    }
-}
-
         stage('Prepare Ansible Inventory') {
             steps {
                 script {
-                    def publicIp = sh(script: "Terraform_module -chdir=${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
+                    def publicIp = sh(
+                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
+                        returnStdout: true
+                    ).trim()
+
                     def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
+
                     sh "chmod 600 ${pemFile}"
 
                     def inventory = """
@@ -157,8 +169,13 @@ all:
       ansible_python_interpreter: /usr/bin/python3
       ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
 """
-                    writeFile file: 'inventory_generated.yml', text: inventory
-                    echo "Ansible inventory created:\\n${inventory}"
+
+                    writeFile(
+                        file: 'inventory_generated.yml',
+                        text: inventory
+                    )
+
+                    echo "Ansible inventory created:\n${inventory}"
                 }
             }
         }
@@ -169,21 +186,28 @@ all:
             }
         }
 
-        stage('Build & Run Docker') {
-            steps {
-                sh 'docker compose up -d --remove-orphans'
-            }
-        } 
-
         stage('Build Docker Image') {
             steps {
                 script {
-                    def buildResult = sh(script: 'docker build -t ecommerce-app:latest .', returnStatus: true)
+                    def buildResult = sh(
+                        script: 'docker build -t ecommerce-app:latest .',
+                        returnStatus: true
+                    )
+
                     if (buildResult != 0) {
-                        sh 'docker logs $(docker ps -q --filter "name=ecommerce-app") || true'
+                        sh '''
+                            docker logs $(docker ps -q --filter "name=ecommerce-app") || true
+                        '''
+
                         error "Docker build failed"
                     }
                 }
+            }
+        }
+
+        stage('Build & Run Docker') {
+            steps {
+                sh 'docker compose up -d --remove-orphans'
             }
         }
 
@@ -199,21 +223,31 @@ all:
         stage('Setup Minikube on EC2') {
             steps {
                 script {
-                    def publicIp = sh(script: "Terraform_module/terraform_project/environments/dev -chdir=${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
+                    def publicIp = sh(
+                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
+                        returnStdout: true
+                    ).trim()
+
                     def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
+
                     sh "chmod 600 ${pemFile}"
 
                     sh """
-                        ssh -o StrictHostKeyChecking=no -i ${pemFile} ec2-user@${publicIp} '
-                            export PATH=~/bin:\$PATH
-                            export KUBECONFIG=~/.kube/config
-                            echo "Kubectl version:"
-                            kubectl version --client
-                            echo "Deploying K8S manifests..."
-                            kubectl apply -f ~/app/K8S/
-                            kubectl get all -n devops-tools
-                            kubectl get pvc -n devops-tools
-                            kubectl describe deployment jenkins -n devops-tools
+                        ssh -o StrictHostKeyChecking=no \
+                            -i ${pemFile} \
+                            ec2-user@${publicIp} '
+                                export PATH=~/bin:\\$PATH
+                                export KUBECONFIG=~/.kube/config
+
+                                echo "Kubectl version:"
+                                kubectl version --client
+
+                                echo "Deploying K8S manifests:"
+                                kubectl apply -f ~/app/K8S/
+
+                                kubectl get all -n devops-tools
+                                kubectl get pvc -n devops-tools
+                                kubectl describe deployment jenkins -n devops-tools
                             '
                     """
                 }
@@ -223,18 +257,25 @@ all:
         stage('Deploy to Kubernetes on EC2') {
             steps {
                 script {
-                    def publicIp = sh(script: "Terraform_module/terraform_project/environments/dev -chdir=${TERRAFORM_DIR} output -raw public_ip", returnStdout: true).trim()
+                    def publicIp = sh(
+                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
+                        returnStdout: true
+                    ).trim()
+
                     def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
 
                     sh """
-                        ssh -o StrictHostKeyChecking=no -i ${pemFile} ec2-user@${publicIp} '
-                            export PATH=~/bin:\$PATH
-                            export KUBECONFIG=~/.kube/config
-                            kubectl apply -f ~/app/K8S/
-                            kubectl get all -n devops-tools
-                            kubectl get pvc -n devops-tools
-                            kubectl describe deployment jenkins -n devops-tools
-                        '
+                        ssh -o StrictHostKeyChecking=no \
+                            -i ${pemFile} \
+                            ec2-user@${publicIp} '
+                                export PATH=~/bin:\\$PATH
+                                export KUBECONFIG=~/.kube/config
+
+                                kubectl apply -f ~/app/K8S/
+                                kubectl get all -n devops-tools
+                                kubectl get pvc -n devops-tools
+                                kubectl describe deployment jenkins -n devops-tools
+                            '
                     """
                 }
             }
@@ -242,23 +283,35 @@ all:
 
         stage('Push to Docker Hub') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-credentials', 
-                    usernameVariable: 'DOCKER_USER', 
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh """
-                        echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
-                        docker tag ecommerce-app:latest \$DOCKER_USER/ecommerce-app:${IMAGE_TAG}
-                        docker push \$DOCKER_USER/ecommerce-app:${IMAGE_TAG}
-                    """
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login \
+                            -u "$DOCKER_USER" \
+                            --password-stdin
+
+                        docker tag \
+                            ecommerce-app:latest \
+                            "$DOCKER_USER/ecommerce-app:${IMAGE_TAG}"
+
+                        docker push \
+                            "$DOCKER_USER/ecommerce-app:${IMAGE_TAG}"
+                    '''
                 }
             }
         }
 
         stage('Archive Artifacts') {
             steps {
-                archiveArtifacts artifacts: '**/*.py', fingerprint: true
+                archiveArtifacts(
+                    artifacts: '**/*.py',
+                    fingerprint: true
+                )
             }
         }
 
@@ -280,22 +333,33 @@ all:
                     if [ ! -d "venv" ]; then
                         python3 -m venv --copies --upgrade-deps venv
                     fi
+
                     chmod +x venv/bin/python3
-                    ./venv/bin/python3 -m pip install --upgrade "pip<24" setuptools wheel
-                    ./venv/bin/python3 -m pip install -r requirements.txt pytest selenium
-                    ./venv/bin/python3 -m pytest tests/selenium --maxfail=1 --disable-warnings -q
+
+                    ./venv/bin/python3 -m pip install \
+                        --upgrade "pip<24" setuptools wheel
+
+                    ./venv/bin/python3 -m pip install \
+                        -r requirements.txt pytest selenium
+
+                    ./venv/bin/python3 -m pytest \
+                        tests/selenium \
+                        --maxfail=1 \
+                        --disable-warnings \
+                        -q
                 '''
             }
         }
-
     }
 
     post {
         always {
             echo 'Ensuring all containers are running'
-            sh 'docker compose up -d --remove-orphans'
+            sh 'docker compose up -d --remove-orphans || true'
         }
     }
+}
+```
 
 
 
