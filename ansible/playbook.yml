@@ -133,9 +133,23 @@
       become: yes
       become_user: "{{ jenkins_user }}"
 
+    - name: Create devops-tools namespace
+      ansible.builtin.shell: |
+        {{ jenkins_home }}/bin/kubectl create namespace devops-tools \
+          --dry-run=client \
+          -o yaml | {{ jenkins_home }}/bin/kubectl apply -f -
+      become: yes
+      become_user: "{{ jenkins_user }}"
+      environment:
+        HOME: "{{ jenkins_home }}"
+        PATH: "{{ jenkins_home }}/bin:/usr/local/bin:/usr/bin:/bin"
+        KUBECONFIG: "{{ jenkins_home }}/.kube/config"
+      args:
+        executable: /bin/bash
+
     - name: Apply K8S manifests
-      ansible.builtin.shell: >
-        {{ jenkins_home }}/bin/kubectl apply
+      ansible.builtin.shell: |
+        {{ jenkins_home }}/bin/kubectl apply 
         -f {{ jenkins_home }}/app/K8S/
       become: yes
       become_user: "{{ jenkins_user }}"
