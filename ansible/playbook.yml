@@ -118,14 +118,20 @@
       args:
         executable: /bin/bash
 
-    - name: Ensure ~/app/K8S directory exists
-      ansible.builtin.file:
-        path: "{{ jenkins_home }}/app/K8S"
-        state: directory
-        mode: '0755'
-        owner: ec2-user
-        group: ec2-user
-      become: yes
+      - name: Ensure ~/app/K8S directory exists
+        ansible.builtin.file:
+          path: "{{ jenkins_home }}/app/K8S"
+          state: directory
+          owner: "{{ jenkins_user }}"
+          group: "{{ jenkins_user }}"
+          mode: '0755'
+       become: yes
+
+  - name: Copy Kubernetes manifests from cloned repository
+    ansible.builtin.shell: |
+      cp -r "{{ jenkins_home }}/e-commerce/K8S/." "{{ jenkins_home }}/app/K8S/"
+    become: yes
+    become_user: "{{ jenkins_user }}"
 
     - name: Copy Kubernetes manifests
       ansible.builtin.copy:
