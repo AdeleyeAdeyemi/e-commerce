@@ -37,11 +37,10 @@
     - name: Clone GitHub repo
       ansible.builtin.git:
         repo: https://github.com/AdeleyeAdeyemi/e-commerce.git
-        dest: "{{ jenkins_home }}/e-commerce"
+        dest: /home/ec2-user/e-commerce
         version: main
         force: yes
       become: yes
-      become_user: "{{ jenkins_user }}"
 
     # Do not start Elasticsearch/Logstash/Kibana before Minikube.
     # They consume too much RAM and disk on this test instance.
