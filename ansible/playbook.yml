@@ -27,7 +27,7 @@
 
     - name: Add ec2-user to docker group
       ansible.builtin.user:
-        name: ec2-user
+        name: "{{ jenkins_user }}"
         groups: docker
         append: yes
 
@@ -37,12 +37,12 @@
     - name: Clone GitHub repo
       ansible.builtin.git:
         repo: https://github.com/AdeleyeAdeyemi/e-commerce.git
-        dest: /home/ec2-user/e-commerce
+        dest: "{{ jenkins_home }}/e-commerce"
         version: main
         force: yes
       become: yes
+      become_user: "{{ jenkins_user }}"
 
-    # IMPORTANT:
     # Do not start Elasticsearch/Logstash/Kibana before Minikube.
     # They consume too much RAM and disk on this test instance.
 
@@ -75,32 +75,32 @@
         path: "{{ jenkins_home }}/bin"
         state: directory
         mode: '0755'
-        owner: ec2-user
-        group: ec2-user
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_user }}"
 
     - name: Download kubectl
       ansible.builtin.get_url:
         url: "https://dl.k8s.io/release/{{ kubectl_version.stdout }}/bin/linux/amd64/kubectl"
         dest: "{{ jenkins_home }}/bin/kubectl"
         mode: '0755'
-      become: no
-      environment:
-        HOME: "{{ jenkins_home }}"
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_user }}"
+      become: yes
 
     - name: Install Minikube
       ansible.builtin.get_url:
-        url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        url: "https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64"
         dest: "{{ jenkins_home }}/bin/minikube"
         mode: '0755'
-      become: no
-      environment:
-        HOME: "{{ jenkins_home }}"
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_user }}"
+      become: yes
 
     - name: Fix Minikube directory ownership
       ansible.builtin.file:
         path: "{{ jenkins_home }}/.minikube"
-        owner: ec2-user
-        group: ec2-user
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_user }}"
         recurse: yes
       become: yes
       failed_when: false
@@ -111,43 +111,35 @@
         --driver=docker
         --kubernetes-version=stable
       become: yes
-      become_user: ec2-user
+      become_user: "{{ jenkins_user }}"
       environment:
         HOME: "{{ jenkins_home }}"
         PATH: "{{ jenkins_home }}/bin:/usr/local/bin:/usr/bin:/bin"
       args:
         executable: /bin/bash
 
-      - name: Ensure ~/app/K8S directory exists
-        ansible.builtin.file:
-          path: "{{ jenkins_home }}/app/K8S"
-          state: directory
-          owner: "{{ jenkins_user }}"
-          group: "{{ jenkins_user }}"
-          mode: '0755'
-       become: yes
-
-  - name: Copy Kubernetes manifests from cloned repository
-    ansible.builtin.shell: |
-      cp -r "{{ jenkins_home }}/e-commerce/K8S/." "{{ jenkins_home }}/app/K8S/"
-    become: yes
-    become_user: "{{ jenkins_user }}"
-
-    - name: Copy Kubernetes manifests
-      ansible.builtin.copy:
-        src: "{{ jenkins_home }}/e-commerce/K8S/"
-        dest: "{{ jenkins_home }}/app/K8S/"
-        owner: ec2-user
-        group: ec2-user
+    - name: Ensure ~/app/K8S directory exists
+      ansible.builtin.file:
+        path: "{{ jenkins_home }}/app/K8S"
+        state: directory
+        owner: "{{ jenkins_user }}"
+        group: "{{ jenkins_user }}"
         mode: '0755'
       become: yes
+
+    - name: Copy Kubernetes manifests from cloned repository
+      ansible.builtin.shell: |
+        cp -r "{{ jenkins_home }}/e-commerce/K8S/." \
+              "{{ jenkins_home }}/app/K8S/"
+      become: yes
+      become_user: "{{ jenkins_user }}"
 
     - name: Apply K8S manifests
       ansible.builtin.shell: >
         {{ jenkins_home }}/bin/kubectl apply
         -f {{ jenkins_home }}/app/K8S/
       become: yes
-      become_user: ec2-user
+      become_user: "{{ jenkins_user }}"
       environment:
         HOME: "{{ jenkins_home }}"
         PATH: "{{ jenkins_home }}/bin:/usr/local/bin:/usr/bin:/bin"
@@ -159,13 +151,15 @@
       ansible.builtin.shell: >
         {{ jenkins_home }}/bin/kubectl get nodes
       become: yes
-      become_user: ec2-user
+      become_user: "{{ jenkins_user }}"
       environment:
         HOME: "{{ jenkins_home }}"
         PATH: "{{ jenkins_home }}/bin:/usr/local/bin:/usr/bin:/bin"
         KUBECONFIG: "{{ jenkins_home }}/.kube/config"
       args:
         executable: /bin/bash
+
+
 
 
 
