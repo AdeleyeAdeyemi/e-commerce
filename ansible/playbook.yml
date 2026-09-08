@@ -149,8 +149,7 @@
 
     - name: Apply K8S manifests
       ansible.builtin.shell: |
-        {{ jenkins_home }}/bin/kubectl apply 
-        -f {{ jenkins_home }}/app/K8S/
+        {{ jenkins_home }}/bin/kubectl apply  -f {{ jenkins_home }}/app/K8S/
       become: yes
       become_user: "{{ jenkins_user }}"
       environment:
