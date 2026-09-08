@@ -36,8 +36,3 @@ COPY --from=builder /build/products.json ./products.json
 EXPOSE 8777
 
 CMD ["app.py"]
-<<<<<<< HEAD
-=======
-  
-
->>>>>>> aff130b (Refactor Terraform configuration)
