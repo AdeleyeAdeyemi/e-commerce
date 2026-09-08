@@ -296,7 +296,7 @@ all:
             sh 'docker compose up -d --remove-orphans'
         }
     }
-}
+
 
 
 
