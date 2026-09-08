@@ -105,7 +105,7 @@
       failed_when: false
 
     - name: Start Minikube as ec2-user
-      ansible.builtin.shell: >
+      ansible.builtin.shell: |
         {{ jenkins_home }}/bin/minikube start
         --driver=docker
         --kubernetes-version=stable
@@ -160,7 +160,7 @@
         executable: /bin/bash
 
     - name: Verify Minikube nodes
-      ansible.builtin.shell: >
+      ansible.builtin.shell: |
         {{ jenkins_home }}/bin/kubectl get nodes
       become: yes
       become_user: "{{ jenkins_user }}"
