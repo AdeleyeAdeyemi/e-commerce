@@ -1,4 +1,3 @@
-```groovy
 pipeline {
     agent any
 
@@ -399,28 +398,6 @@ all:
         }
     }
 }
-```
-
-### Important
-
-There is one **non-syntax issue** you should verify before running:
-
-Your EC2 connection uses:
-
-```groovy
-ansible_user: ec2-user
-```
-
-and:
-
-```bash
-ec2-user@${publicIp}
-```
-
-That is appropriate for Amazon Linux. If your AMI `ami-0619724297c6fa28d` is Ubuntu, both need to be changed to `ubuntu`.
-
-Also, the `terraform output` commands in **Prepare Ansible Inventory**, **Setup Minikube on EC2**, and **Deploy to Kubernetes on EC2** now all have AWS credentials available, preventing the `No valid credential sources found` error.
-
     
 
 
