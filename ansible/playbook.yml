@@ -15,7 +15,7 @@
           - docker
           - python3
           - conntrack
-          - curl
+          - curl-minimal
           - tar
         state: present
 
