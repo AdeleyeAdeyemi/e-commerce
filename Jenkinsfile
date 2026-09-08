@@ -139,44 +139,58 @@ pipeline {
                 }
             }
         }
-
         stage('Prepare Ansible Inventory') {
             steps {
                 script {
-                    def publicIp = sh(
-                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
-                        returnStdout: true
-                    ).trim()
-
-                    def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
-
-                    sh "chmod 600 ${pemFile}"
-
-                    def inventory = """
-all:
-  hosts:
-    ${publicIp}:
-      ansible_user: ec2-user
-      ansible_ssh_private_key_file: ${pemFile}
-      ansible_python_interpreter: /usr/bin/python3
-      ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
-"""
-
-                    writeFile(
-                        file: 'inventory_generated.yml',
-                        text: inventory
-                    )
-
-                    echo "Ansible inventory created:\n${inventory}"
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: "${AWS_CREDENTIALS_ID}",
+                            usernameVariable: 'AWS_ACCESS_KEY_ID',
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                        ),
+                        file(
+                            credentialsId: "${PEM_CREDENTIALS_ID}",
+                            variable: 'PEM_FILE'
+                        )
+                    ]) {
+                        def publicIp = sh(
+                            script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
+                            returnStdout: true
+                        ).trim()
+        
+                        sh """
+                            cp '${PEM_FILE}' '${WORKSPACE}/jenkins-key.pem'
+                            chmod 600 '${WORKSPACE}/jenkins-key.pem'
+                        """
+        
+                        def pemFile = "${WORKSPACE}/jenkins-key.pem"
+        
+                        def inventory = """
+        all:
+          hosts:
+            ${publicIp}:
+              ansible_user: ec2-user
+              ansible_ssh_private_key_file: ${pemFile}
+              ansible_python_interpreter: /usr/bin/python3
+              ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+        """
+        
+                        writeFile(
+                            file: 'inventory_generated.yml',
+                            text: inventory
+                        )
+        
+                        echo "Ansible inventory created:\n${inventory}"
+                    }
                 }
             }
         }
 
-        stage('Configure & Deploy with Ansible') {
-            steps {
-                sh 'ansible-playbook -i inventory_generated.yml ansible/playbook.yml'
-            }
-        }
+stage('Configure & Deploy with Ansible') {
+    steps {
+        sh 'ansible-playbook -i inventory_generated.yml ansible/playbook.yml'
+    }
+}
 
         stage('Build Docker Image') {
             steps {
