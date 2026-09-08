@@ -34,12 +34,6 @@
     - name: Reset SSH connection after Docker group change
       ansible.builtin.meta: reset_connection
 
-    - name: Install Docker Compose
-      ansible.builtin.get_url:
-        url: https://github.com/docker/compose/releases/download/v2.6.0/docker-compose-linux-x86_64
-        dest: /usr/local/bin/docker-compose
-        mode: '0755'
-
     - name: Clone GitHub repo
       ansible.builtin.git:
         repo: https://github.com/AdeleyeAdeyemi/e-commerce.git
