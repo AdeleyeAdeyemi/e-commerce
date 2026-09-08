@@ -122,24 +122,17 @@ pipeline {
                                     -var-file=environments/dev/terraform.tfvars
 
                                 DESTROY_STATUS=$?
+                                 if [ "$DESTROY_STATUS" -eq 0 ]; then
+                                     echo "Terraform cleanup completed successfully."
+                                 else
+                                     echo "WARNING: Terraform cleanup FAILED."
+                                     echo "Resources may still exist in AWS."
+                                 fi
 
-                                if [ "$DESTROY_STATUS" -eq 0 ]; then
-                                    echo "========================================"
-                                    echo "Terraform cleanup completed successfully."
-                                    echo "No Terraform-managed resources should remain."
-                                    echo "========================================"
-                                else
-                                    echo "========================================"
-                                    echo "WARNING: Terraform cleanup FAILED."
-                                    echo "Resources may still exist in AWS."
-                                    echo "Check AWS resources manually."
-                                    echo "========================================"
-                                fi
+                                 rm -f environments/dev/terraform.tfvars
+                                 rm -f tfplan
 
-                                rm -f environments/dev/terraform.tfvars
-                                rm -f tfplan
-
-                                exit 0
+                              
                             '''
                         }
                     }
