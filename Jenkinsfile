@@ -214,8 +214,9 @@ all:
         stage('Verify Image') {
             steps {
                 sh '''
-                    docker run --rm ecommerce-app:latest python3 --version
-                    docker run --rm ecommerce-app:latest pip list
+                    docker run --rm --entrypoint python3 ecommerce-app:latest --version
+                    docker run --rm --entrypoint python3 ecommerce-app:latest -m pip list
+                    
                 '''
             }
         }
