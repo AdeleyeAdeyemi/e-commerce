@@ -220,95 +220,6 @@ all:
             }
         }
 
-        stage('Setup Minikube on EC2') {
-            steps {
-                script {
-                    withCredentials([
-                        usernamePassword(
-                            credentialsId: "${AWS_CREDENTIALS_ID}",
-                            usernameVariable: 'AWS_ACCESS_KEY_ID',
-                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                        ),
-                        file(
-                            credentialsId: "${PEM_CREDENTIALS_ID}",
-                            variable: 'PEM_FILE'
-                        )
-                    ]) {
-                        def publicIp = sh(
-                            script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
-                            returnStdout: true
-                        ).trim()
-
-                        sh """
-                            cp '${PEM_FILE}' '${WORKSPACE}/jenkins-key.pem'
-                            chmod 600 '${WORKSPACE}/jenkins-key.pem'
-                        """
-
-                        sh """
-                            ssh -o StrictHostKeyChecking=no \
-                                -i '${WORKSPACE}/jenkins-key.pem' \
-                                ec2-user@${publicIp} '
-                                    export PATH=~/bin:\\$PATH
-                                    export KUBECONFIG=~/.kube/config
-
-                                    echo "Kubectl version:"
-                                    kubectl version --client
-
-                                    echo "Deploying K8S manifests:"
-                                    kubectl apply -f ~/app/K8S/
-
-                                    kubectl get all -n devops-tools
-                                    kubectl get pvc -n devops-tools
-                                    kubectl describe deployment jenkins -n devops-tools
-                                '
-                        """
-                    }
-                }
-            }
-        }
-
-        stage('Deploy to Kubernetes on EC2') {
-            steps {
-                script {
-                    withCredentials([
-                        usernamePassword(
-                            credentialsId: "${AWS_CREDENTIALS_ID}",
-                            usernameVariable: 'AWS_ACCESS_KEY_ID',
-                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                        ),
-                        file(
-                            credentialsId: "${PEM_CREDENTIALS_ID}",
-                            variable: 'PEM_FILE'
-                        )
-                    ]) {
-                        def publicIp = sh(
-                            script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
-                            returnStdout: true
-                        ).trim()
-
-                        sh """
-                            cp '${PEM_FILE}' '${WORKSPACE}/jenkins-key.pem'
-                            chmod 600 '${WORKSPACE}/jenkins-key.pem'
-                        """
-
-                        sh """
-                            ssh -o StrictHostKeyChecking=no \
-                                -i '${WORKSPACE}/jenkins-key.pem' \
-                                ec2-user@${publicIp} '
-                                    export PATH=~/bin:\\$PATH
-                                    export KUBECONFIG=~/.kube/config
-
-                                    kubectl apply -f ~/app/K8S/
-                                    kubectl get all -n devops-tools
-                                    kubectl get pvc -n devops-tools
-                                    kubectl describe deployment jenkins -n devops-tools
-                                '
-                        """
-                    }
-                }
-            }
-        }
-
         stage('Push to Docker Hub') {
             steps {
                 withCredentials([
@@ -383,7 +294,6 @@ all:
     post {
         always {
             echo 'Ensuring all containers are running'
-            sh 'docker compose up -d --remove-orphans || true'
 
             sh '''
                 rm -f "${WORKSPACE}/jenkins-key.pem" || true
