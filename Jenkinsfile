@@ -1,3 +1,4 @@
+```groovy
 pipeline {
     agent any
 
@@ -6,13 +7,13 @@ pipeline {
     }
 
     environment {
-        TERRAFORM_DIR          = "Terraform_module/terraform_project"
-        PEM_CREDENTIALS_ID     = "aws-pem-key"
-        AWS_CREDENTIALS_ID     = "terraform_autho"
-        GITHUB_CREDENTIALS_ID  = "github-credentials"
-        BRANCH_NAME            = "main"
-        REGION                 = "us-east-2"
-        IMAGE_TAG              = "latest"
+        TERRAFORM_DIR         = "Terraform_module/terraform_project"
+        PEM_CREDENTIALS_ID    = "aws-pem-key"
+        AWS_CREDENTIALS_ID    = "terraform_autho"
+        GITHUB_CREDENTIALS_ID = "github-credentials"
+        BRANCH_NAME           = "main"
+        REGION                = "us-east-2"
+        IMAGE_TAG             = "latest"
     }
 
     stages {
@@ -122,23 +123,23 @@ pipeline {
                                     -var-file=environments/dev/terraform.tfvars
 
                                 DESTROY_STATUS=$?
-                                 if [ "$DESTROY_STATUS" -eq 0 ]; then
-                                     echo "Terraform cleanup completed successfully."
-                                 else
-                                     echo "WARNING: Terraform cleanup FAILED."
-                                     echo "Resources may still exist in AWS."
-                                 fi
 
-                                 rm -f environments/dev/terraform.tfvars
-                                 rm -f tfplan
+                                if [ "$DESTROY_STATUS" -eq 0 ]; then
+                                    echo "Terraform cleanup completed successfully."
+                                else
+                                    echo "WARNING: Terraform cleanup FAILED."
+                                    echo "Resources may still exist in AWS."
+                                fi
 
-                              
+                                rm -f environments/dev/terraform.tfvars
+                                rm -f tfplan
                             '''
                         }
                     }
                 }
             }
         }
+
         stage('Prepare Ansible Inventory') {
             steps {
                 script {
@@ -157,40 +158,40 @@ pipeline {
                             script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
                             returnStdout: true
                         ).trim()
-        
+
                         sh """
                             cp '${PEM_FILE}' '${WORKSPACE}/jenkins-key.pem'
                             chmod 600 '${WORKSPACE}/jenkins-key.pem'
                         """
-        
+
                         def pemFile = "${WORKSPACE}/jenkins-key.pem"
-        
+
                         def inventory = """
-        all:
-          hosts:
-            ${publicIp}:
-              ansible_user: ec2-user
-              ansible_ssh_private_key_file: ${pemFile}
-              ansible_python_interpreter: /usr/bin/python3
-              ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
-        """
-        
+all:
+  hosts:
+    ${publicIp}:
+      ansible_user: ec2-user
+      ansible_ssh_private_key_file: ${pemFile}
+      ansible_python_interpreter: /usr/bin/python3
+      ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+"""
+
                         writeFile(
                             file: 'inventory_generated.yml',
                             text: inventory
                         )
-        
+
                         echo "Ansible inventory created:\n${inventory}"
                     }
                 }
             }
         }
 
-stage('Configure & Deploy with Ansible') {
-    steps {
-        sh 'ansible-playbook -i inventory_generated.yml ansible/playbook.yml'
-    }
-}
+        stage('Configure & Deploy with Ansible') {
+            steps {
+                sh 'ansible-playbook -i inventory_generated.yml ansible/playbook.yml'
+            }
+        }
 
         stage('Build Docker Image') {
             steps {
@@ -229,33 +230,46 @@ stage('Configure & Deploy with Ansible') {
         stage('Setup Minikube on EC2') {
             steps {
                 script {
-                    def publicIp = sh(
-                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
-                        returnStdout: true
-                    ).trim()
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: "${AWS_CREDENTIALS_ID}",
+                            usernameVariable: 'AWS_ACCESS_KEY_ID',
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                        ),
+                        file(
+                            credentialsId: "${PEM_CREDENTIALS_ID}",
+                            variable: 'PEM_FILE'
+                        )
+                    ]) {
+                        def publicIp = sh(
+                            script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
+                            returnStdout: true
+                        ).trim()
 
-                    def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
+                        sh """
+                            cp '${PEM_FILE}' '${WORKSPACE}/jenkins-key.pem'
+                            chmod 600 '${WORKSPACE}/jenkins-key.pem'
+                        """
 
-                    sh "chmod 600 ${pemFile}"
+                        sh """
+                            ssh -o StrictHostKeyChecking=no \
+                                -i '${WORKSPACE}/jenkins-key.pem' \
+                                ec2-user@${publicIp} '
+                                    export PATH=~/bin:\\$PATH
+                                    export KUBECONFIG=~/.kube/config
 
-                    sh """
-                        ssh -o StrictHostKeyChecking=no \
-                            -i ${pemFile} \
-                            ec2-user@${publicIp} '
-                                export PATH=~/bin:\\$PATH
-                                export KUBECONFIG=~/.kube/config
+                                    echo "Kubectl version:"
+                                    kubectl version --client
 
-                                echo "Kubectl version:"
-                                kubectl version --client
+                                    echo "Deploying K8S manifests:"
+                                    kubectl apply -f ~/app/K8S/
 
-                                echo "Deploying K8S manifests:"
-                                kubectl apply -f ~/app/K8S/
-
-                                kubectl get all -n devops-tools
-                                kubectl get pvc -n devops-tools
-                                kubectl describe deployment jenkins -n devops-tools
-                            '
-                    """
+                                    kubectl get all -n devops-tools
+                                    kubectl get pvc -n devops-tools
+                                    kubectl describe deployment jenkins -n devops-tools
+                                '
+                        """
+                    }
                 }
             }
         }
@@ -263,26 +277,41 @@ stage('Configure & Deploy with Ansible') {
         stage('Deploy to Kubernetes on EC2') {
             steps {
                 script {
-                    def publicIp = sh(
-                        script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
-                        returnStdout: true
-                    ).trim()
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: "${AWS_CREDENTIALS_ID}",
+                            usernameVariable: 'AWS_ACCESS_KEY_ID',
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                        ),
+                        file(
+                            credentialsId: "${PEM_CREDENTIALS_ID}",
+                            variable: 'PEM_FILE'
+                        )
+                    ]) {
+                        def publicIp = sh(
+                            script: "terraform -chdir=${TERRAFORM_DIR} output -raw public_ip",
+                            returnStdout: true
+                        ).trim()
 
-                    def pemFile = "${TERRAFORM_DIR}/jenkins-key.pem"
+                        sh """
+                            cp '${PEM_FILE}' '${WORKSPACE}/jenkins-key.pem'
+                            chmod 600 '${WORKSPACE}/jenkins-key.pem'
+                        """
 
-                    sh """
-                        ssh -o StrictHostKeyChecking=no \
-                            -i ${pemFile} \
-                            ec2-user@${publicIp} '
-                                export PATH=~/bin:\\$PATH
-                                export KUBECONFIG=~/.kube/config
+                        sh """
+                            ssh -o StrictHostKeyChecking=no \
+                                -i '${WORKSPACE}/jenkins-key.pem' \
+                                ec2-user@${publicIp} '
+                                    export PATH=~/bin:\\$PATH
+                                    export KUBECONFIG=~/.kube/config
 
-                                kubectl apply -f ~/app/K8S/
-                                kubectl get all -n devops-tools
-                                kubectl get pvc -n devops-tools
-                                kubectl describe deployment jenkins -n devops-tools
-                            '
-                    """
+                                    kubectl apply -f ~/app/K8S/
+                                    kubectl get all -n devops-tools
+                                    kubectl get pvc -n devops-tools
+                                    kubectl describe deployment jenkins -n devops-tools
+                                '
+                        """
+                    }
                 }
             }
         }
@@ -362,13 +391,37 @@ stage('Configure & Deploy with Ansible') {
         always {
             echo 'Ensuring all containers are running'
             sh 'docker compose up -d --remove-orphans || true'
+
+            sh '''
+                rm -f "${WORKSPACE}/jenkins-key.pem" || true
+                rm -f "${WORKSPACE}/inventory_generated.yml" || true
+            '''
         }
     }
 }
+```
 
+### Important
 
+There is one **non-syntax issue** you should verify before running:
 
+Your EC2 connection uses:
 
+```groovy
+ansible_user: ec2-user
+```
+
+and:
+
+```bash
+ec2-user@${publicIp}
+```
+
+That is appropriate for Amazon Linux. If your AMI `ami-0619724297c6fa28d` is Ubuntu, both need to be changed to `ubuntu`.
+
+Also, the `terraform output` commands in **Prepare Ansible Inventory**, **Setup Minikube on EC2**, and **Deploy to Kubernetes on EC2** now all have AWS credentials available, preventing the `No valid credential sources found` error.
+
+    
 
 
 
