@@ -215,7 +215,7 @@ all:
             steps {
                 sh '''
                     docker run --rm --entrypoint python3 ecommerce-app:latest --version
-                    docker run --rm --entrypoint python3 ecommerce-app:latest -m pip list
+                    docker run --rm --entrypoint python3 ecommerce-app:latest -c "import flask; print('Flask:', flask.__version__)"
                     
                 '''
             }
