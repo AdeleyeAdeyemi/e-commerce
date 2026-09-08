@@ -106,8 +106,7 @@
 
     - name: Start Minikube as ec2-user
       ansible.builtin.shell: |
-        {{ jenkins_home }}/bin/minikube start
-        --driver=docker
+        {{ jenkins_home }}/bin/minikube start  --driver=docker
         --kubernetes-version=stable
       become: yes
       become_user: "{{ jenkins_user }}"
