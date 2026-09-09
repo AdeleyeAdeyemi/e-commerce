@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: ecommerce-app
-          image: adeleyeade/ecommerce-app:latest   # 👈 replace with your Docker Hub repo
+          image: undefinedboss/ecommerce-app:latest   # 👈 replace with your Docker Hub repo
           ports:
             - containerPort: 5000
           env:
