@@ -2,5 +2,6 @@
 flask
 pytest
 selenium
+python-logstash
 
 
