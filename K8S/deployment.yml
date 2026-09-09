@@ -18,7 +18,7 @@ spec:
         - name: ecommerce-app
           image: undefinedboss/ecommerce-app:latest   # 👈 replace with your Docker Hub repo
           ports:
-            - containerPort: 5000
+            - containerPort: 8777
           env:
             - name: FLASK_ENV
               value: "production"
