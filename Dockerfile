@@ -6,8 +6,6 @@
 # The dockerfile should use distroless images for the final stage to minimize the attack surface.
 # The dockerfile will also include a health check to ensure the application is running correctly.
  # The Dockerfile should have Harden the Runtime#
-
-```dockerfile
 # =========================
 # Stage 1: Builder
 # =========================
@@ -52,4 +50,4 @@ ENV PYTHONPATH=/app/site-packages
 EXPOSE 8777
 
 CMD ["app.py"]
-```
+
