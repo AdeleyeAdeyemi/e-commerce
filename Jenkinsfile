@@ -214,9 +214,15 @@ all:
         stage('Verify Image') {
             steps {
                 sh '''
-                    docker run --rm --entrypoint python3 ecommerce-app:latest --version
-                    docker run --rm --entrypoint python3 ecommerce-app:latest -c "import flask; print('Flask:', flask.__version__)"
-                    
+                     docker run --rm \
+                         --entrypoint python3 \
+                         ecommerce-app:latest \
+                         --version
+    
+                    docker run --rm \
+                        --entrypoint python3 \
+                        ecommerce-app:latest \
+                        -c "import flask; print('Flask installed successfully')"
                 '''
             }
         }
