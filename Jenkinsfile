@@ -23,7 +23,6 @@ pipeline {
                     branches: [[name: "*/${BRANCH_NAME}"]],
                     userRemoteConfigs: [[
                         url: 'https://github.com/AdeleyeAdeyemi/e-commerce',
-                        credentialsId: "${GITHUB_CREDENTIALS_ID}"
                     ]]
                 ])
             }
