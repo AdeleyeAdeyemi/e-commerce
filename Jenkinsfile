@@ -37,7 +37,11 @@ pipeline {
 
                     withSonarQubeEnv('SonarQube') {
                         sh """
-                            ${scannerHome}/bin/sonar-scanner
+                            ${scannerHome}/bin/sonar-scanner \
+                              -Dsonar.projectKey=AdeleyeAdeyemi_e-commerce \
+                              -Dsonar.projectName=e-commerce \
+                              -Dsonar.sources=. \
+                              -Dsonar.exclusions='**/.git/**,**/venv/**,**/__pycache__/**,**/node_modules/**,**/tests/**'
                         """
                     }
                 }
