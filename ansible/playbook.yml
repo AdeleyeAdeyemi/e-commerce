@@ -211,7 +211,7 @@
     - name: Verify ecommerce NodePort forwarding
       become: true
       ansible.builtin.uri:
-        url: "http://{{ ansible_host }}:31804"
+        url:  "http://127.0.0.1:31804"
         status_code: 200
     
   
