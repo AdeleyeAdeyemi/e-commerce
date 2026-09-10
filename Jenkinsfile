@@ -9,7 +9,6 @@ pipeline {
         TERRAFORM_DIR         = "Terraform_module/terraform_project"
         PEM_CREDENTIALS_ID    = "aws-pem-key"
         AWS_CREDENTIALS_ID    = "terraform_autho"
-        GITHUB_CREDENTIALS_ID = "github-credentials"
         BRANCH_NAME           = "main"
         REGION                = "us-east-2"
         IMAGE_TAG             = "latest"
