@@ -27,6 +27,14 @@ resource "aws_security_group" "main" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    description = "E-commerce Kubernetes NodePort"
+    from_port   = 31804
+    to_port     = 31804
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
