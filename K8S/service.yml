@@ -3,10 +3,12 @@ kind: Service
 metadata:
   name: ecommerce-service
 spec:
+  type: NodePort
   selector:
     app: ecommerce
   ports:
     - protocol: TCP
       port: 80
       targetPort: 8777
-  type: LoadBalancer
+      nodePort: 31804
+
